@@ -11,7 +11,7 @@ A cross-platform Bun CLI named `tracksmith` for working with audio tracks in Mat
 3. Generate a short audio/video alignment test clip.
 4. Mux the aligned audio into another MKV.
 
-The tool orchestrates `ffmpeg`, `ffprobe`, and `mkvmerge` (MKVToolNix). It never encodes, decodes, or otherwise modifies audio: audio is always stream-copied. It makes no claims about creating Dolby Atmos or any other format it merely copies.
+The tool orchestrates `ffmpeg` and `mkvmerge` (MKVToolNix); `ffprobe` turned out to be unnecessary because all probing goes through `mkvmerge -J`. It never encodes, decodes, or otherwise modifies audio: audio is always stream-copied. It makes no claims about creating Dolby Atmos or any other format it merely copies.
 
 ## Invocation and packaging
 
@@ -23,7 +23,7 @@ The tool orchestrates `ffmpeg`, `ffprobe`, and `mkvmerge` (MKVToolNix). It never
 
 ## External tool requirements
 
-`ffmpeg`, `ffprobe`, and `mkvmerge` must be on `PATH`.
+`ffmpeg` and `mkvmerge` must be on `PATH`.
 
 - Before running a command, tracksmith verifies the tools that command needs.
 - A missing tool produces an actionable error naming the tool and how to install it (winget/scoop for Windows, brew for macOS, apt/pacman hints for Linux) — not a raw spawn failure.
@@ -100,7 +100,7 @@ src/
     test-clip.ts
     mux.ts
   probe.ts      wraps `mkvmerge -J`: track listing + track validation
-  tools.ts      PATH detection for ffmpeg/ffprobe/mkvmerge + install hints
+  tools.ts      PATH detection for ffmpeg/mkvmerge + install hints
   runner.ts     small process-execution interface + Bun implementation
   output.ts     default output naming + overwrite policy (prompt/--force)
 ```

@@ -1,13 +1,11 @@
 import { CliError } from "./types.ts";
 
-export const TOOLS = ["ffmpeg", "ffprobe", "mkvmerge"] as const;
+export const TOOLS = ["ffmpeg", "mkvmerge"] as const;
 export type ToolName = (typeof TOOLS)[number];
 export type WhichFn = (cmd: string) => string | null;
 
 const INSTALL_HINTS = {
   ffmpeg: "Windows: winget install Gyan.FFmpeg | macOS: brew install ffmpeg | Linux: sudo apt install ffmpeg",
-  ffprobe:
-    "ffprobe ships with FFmpeg. Windows: winget install Gyan.FFmpeg | macOS: brew install ffmpeg | Linux: sudo apt install ffmpeg",
   mkvmerge:
     "Windows: winget install MoritzBunkus.MKVToolNix | macOS: brew install mkvtoolnix | Linux: sudo apt install mkvtoolnix",
 } satisfies Record<ToolName, string>;

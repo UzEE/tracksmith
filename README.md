@@ -5,22 +5,9 @@ Tracksmith is a Bun CLI for MKV files. It inspects tracks, extracts an audio tra
 ## Requirements
 
 - [Bun](https://bun.com)
-- `ffmpeg`, `ffprobe`, and `mkvmerge` available on `PATH`
+- `ffmpeg` and `mkvmerge` available on `PATH`
 
 `ffmpeg`:
-
-```powershell
-# Windows
-winget install Gyan.FFmpeg
-
-# macOS
-brew install ffmpeg
-
-# Linux
-sudo apt install ffmpeg
-```
-
-`ffprobe` ships with FFmpeg:
 
 ```powershell
 # Windows
@@ -73,7 +60,7 @@ bunx tracksmith test-clip --video "D:\rips\Movie TargetCut.mkv" --audio "D:\rips
 bunx tracksmith mux --video "D:\rips\Movie TargetCut.mkv" --audio "D:\rips\Movie DonorCut.track2.mka" --delay-ms=250 --name "Donor E-AC-3 7.1" --default --output "D:\rips\Movie Final.mkv"
 ```
 
-Positive `--delay-ms` delays audio; negative values advance it. Write negative values with the equals form, such as `--delay-ms=-250`. Check sync near the beginning, middle, and end of the file. If the required offset changes, the files differ by frame rate or edits and one constant delay cannot fix them.
+Positive `--delay-ms` delays audio; negative values advance it (e.g. `--delay-ms -250` or `--delay-ms=-250`). Check sync near the beginning, middle, and end of the file. If the required offset changes, the files differ by frame rate or edits and one constant delay cannot fix them.
 
 If an output already exists, an interactive terminal asks for confirmation with a y/N prompt. Pass `--force` to overwrite without prompting. Non-interactive sessions refuse to overwrite unless `--force` is provided.
 

@@ -8,7 +8,7 @@ const allPresent = (cmd: string) => `/usr/bin/${cmd}`;
 test("findMissingTools reports only tools which() cannot resolve", () => {
   const onlyFfmpeg = (cmd: string) => (cmd === "ffmpeg" ? "/usr/bin/ffmpeg" : null);
   expect(findMissingTools(["ffmpeg", "mkvmerge"], onlyFfmpeg)).toEqual(["mkvmerge"]);
-  expect(findMissingTools(["ffmpeg", "ffprobe", "mkvmerge"], allPresent)).toEqual([]);
+  expect(findMissingTools(["ffmpeg", "mkvmerge"], allPresent)).toEqual([]);
 });
 
 test("requireTools passes silently when everything is present", () => {
@@ -30,7 +30,7 @@ test("requireTools throws a CliError naming every missing tool with an install h
 });
 
 test("install hints cover Windows, macOS, and Linux", () => {
-  for (const tool of ["ffmpeg", "ffprobe", "mkvmerge"] as const) {
+  for (const tool of ["ffmpeg", "mkvmerge"] as const) {
     const hint = installHint(tool);
     expect(hint).toContain("winget");
     expect(hint).toContain("brew");
