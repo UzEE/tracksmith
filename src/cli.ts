@@ -22,7 +22,7 @@ Usage:
 
 Notes:
   --track is always the MKVToolNix track ID shown by "tracksmith inspect".
-  Positive --delay-ms delays audio; negative advances it. Write negatives as --delay-ms=-250.
+  Positive --delay-ms delays audio; negative advances it (e.g. --delay-ms -250).
   Times accept seconds (90, 90.5) or HH:MM:SS[.ms].
   Check sync near the beginning, middle, and end; a changing offset cannot be fixed by one delay.
   Requires ffmpeg and MKVToolNix (mkvmerge) on PATH.`;
@@ -50,12 +50,30 @@ function parseOrCliError<T>(parseFn: () => T): T {
   }
 }
 
+// parseArgs treats a leading-dash value token ("-250") as an option, so fold
+// `--delay-ms -250` into the equals form it does accept.
+function normalizeDelayMs(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]!;
+    const next = args[i + 1];
+    if (arg === "--delay-ms" && next !== undefined && /^-\d+$/.test(next)) {
+      out.push(`--delay-ms=${next}`);
+      i += 1;
+    } else {
+      out.push(arg);
+    }
+  }
+  return out;
+}
+
 export async function runCli(
   argv: string[],
   deps: CommandDeps,
   stdout: (line: string) => void = console.log,
 ): Promise<number> {
-  const [command, ...rest] = argv;
+  const [command, ...rawRest] = argv;
+  const rest = normalizeDelayMs(rawRest);
   try {
     switch (command) {
       case undefined: {

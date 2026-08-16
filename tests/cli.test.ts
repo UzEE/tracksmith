@@ -8,7 +8,8 @@ function makeDeps(runner: FakeRunner): CommandDeps {
     runner,
     isTTY: false,
     confirm: async () => false,
-    exists: () => false,
+    // Inputs the tests reference exist; output paths do not.
+    exists: (path) => ["movie.mkv", "t.mkv", "a.mka"].includes(path),
     which: (cmd) => `/usr/bin/${cmd}`,
   };
 }
@@ -72,6 +73,23 @@ test("negative delay is accepted in equals form", async () => {
   runner.queue({ exitCode: 0 });
   const code = await runCli(
     ["mux", "--video", "t.mkv", "--audio", "a.mka", "--delay-ms=-250", "--output", "o.mkv"],
+    makeDeps(runner),
+    () => {},
+  );
+  expect(code).toBe(0);
+  expect(runner.calls[1]).toContain("0:-250");
+});
+
+test("negative delay is accepted in space form", async () => {
+  const runner = new FakeRunner();
+  runner.queue({
+    stdout: JSON.stringify({
+      tracks: [{ id: 0, type: "audio", codec: "E-AC-3", properties: { audio_channels: 8 } }],
+    }),
+  });
+  runner.queue({ exitCode: 0 });
+  const code = await runCli(
+    ["mux", "--video", "t.mkv", "--audio", "a.mka", "--delay-ms", "-250", "--output", "o.mkv"],
     makeDeps(runner),
     () => {},
   );
