@@ -34,7 +34,7 @@ export function parseMkvmergeJson(json: string): Track[] {
 export async function probeTracks(runner: Runner, file: string): Promise<Track[]> {
   const result = await runner.run(["mkvmerge", "-J", file]);
   if (result.exitCode >= 2) {
-    throw new CliError(`mkvmerge could not read "${file}":\n${result.stderr || result.stdout}`);
+    throw new CliError(`mkvmerge could not read "${file}" (exit ${result.exitCode}):\n${result.stderr || result.stdout}`);
   }
   return parseMkvmergeJson(result.stdout);
 }

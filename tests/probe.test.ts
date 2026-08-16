@@ -31,10 +31,13 @@ test("probeTracks invokes mkvmerge -J with the file path verbatim", async () => 
   expect(tracks).toHaveLength(4);
 });
 
-test("probeTracks throws CliError when mkvmerge cannot read the file", async () => {
+test("probeTracks surfaces the exit code and stderr when mkvmerge cannot read the file", async () => {
   const runner = new FakeRunner();
   runner.queue({ exitCode: 2, stderr: "unsupported container" });
-  await expect(probeTracks(runner, "broken.mkv")).rejects.toThrow(CliError);
+  const attempt = probeTracks(runner, "broken.mkv");
+  await expect(attempt).rejects.toThrow(CliError);
+  await expect(attempt).rejects.toThrow(/\(exit 2\)/);
+  await expect(attempt).rejects.toThrow(/unsupported container/);
 });
 
 test("requireAudioTrack returns the audio track for a valid id", () => {
