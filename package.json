@@ -1,12 +1,17 @@
 {
   "name": "tracksmith",
-  "module": "index.ts",
+  "version": "0.1.0",
   "type": "module",
   "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
+  "bin": {
+    "tracksmith": "./src/cli.ts"
   },
-  "peerDependencies": {
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bun x tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
     "typescript": "^5"
   }
 }
