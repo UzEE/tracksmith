@@ -1,7 +1,7 @@
 import type { CommandDeps } from "../types.ts";
 import { CliError } from "../types.ts";
 import { audioRelativeIndex, probeTracks, requireAudioTrack } from "../probe.ts";
-import { defaultTestClipOutput, ensureWritable } from "../output.ts";
+import { defaultTestClipOutput, ensureWritable, requireInputFile } from "../output.ts";
 
 export function parseTimeToSeconds(value: string): number {
   if (/^\d+(\.\d+)?$/.test(value)) return Number(value);
@@ -73,6 +73,8 @@ export async function testClipCommand(
   },
   deps: CommandDeps,
 ): Promise<string> {
+  requireInputFile(opts.video, deps.exists);
+  requireInputFile(opts.audio, deps.exists);
   const donorTracks = await probeTracks(deps.runner, opts.audio);
   requireAudioTrack(donorTracks, opts.track);
   const output = opts.output ?? defaultTestClipOutput(opts.video);

@@ -14,6 +14,10 @@ export function defaultTestClipOutput(video: string): string {
   return `${stemPath(video)}.sync-test.mkv`;
 }
 
+export function requireInputFile(path: string, exists: (path: string) => boolean = existsSync): void {
+  if (!exists(path)) throw new CliError(`Input file not found: "${path}".`);
+}
+
 export interface OverwriteContext {
   force: boolean;
   isTTY: boolean;

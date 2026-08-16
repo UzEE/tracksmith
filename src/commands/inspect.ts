@@ -1,5 +1,6 @@
 import type { CommandDeps, Track } from "../types.ts";
 import { probeTracks } from "../probe.ts";
+import { requireInputFile } from "../output.ts";
 
 export function formatTrackTable(tracks: Track[]): string {
   const header = ["ID", "TYPE", "CODEC", "LANG", "CH", "DEFAULT", "NAME"];
@@ -20,5 +21,6 @@ export function formatTrackTable(tracks: Track[]): string {
 }
 
 export async function inspectCommand(file: string, deps: CommandDeps): Promise<string> {
+  requireInputFile(file, deps.exists);
   return formatTrackTable(await probeTracks(deps.runner, file));
 }

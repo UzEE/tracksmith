@@ -17,7 +17,15 @@ test("formatTrackTable renders aligned columns with placeholders for missing val
 test("inspectCommand probes the file and returns the table", async () => {
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
-  const out = await inspectCommand("movie.mkv", { runner, isTTY: false, confirm: async () => false });
+  const out = await inspectCommand("movie.mkv", { runner, isTTY: false, confirm: async () => false, exists: () => true });
   expect(runner.calls).toEqual([["mkvmerge", "-J", "movie.mkv"]]);
   expect(out).toContain("E-AC-3");
+});
+
+test("inspectCommand rejects a missing input file before probing", async () => {
+  const runner = new FakeRunner();
+  await expect(
+    inspectCommand("gone.mkv", { runner, isTTY: false, confirm: async () => false, exists: () => false }),
+  ).rejects.toThrow(/Input file not found/);
+  expect(runner.calls).toHaveLength(0);
 });

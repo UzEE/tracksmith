@@ -1,7 +1,7 @@
 import type { CommandDeps, Track } from "../types.ts";
 import { CliError } from "../types.ts";
 import { probeTracks, requireAudioTrack } from "../probe.ts";
-import { ensureWritable } from "../output.ts";
+import { ensureWritable, requireInputFile } from "../output.ts";
 
 export function resolveAudioTrackId(tracks: Track[], requested: number | undefined): number {
   if (requested !== undefined) return requireAudioTrack(tracks, requested).id;
@@ -60,6 +60,8 @@ export async function muxCommand(
   },
   deps: CommandDeps,
 ): Promise<string> {
+  requireInputFile(opts.video, deps.exists);
+  requireInputFile(opts.audio, deps.exists);
   const audioTracks = await probeTracks(deps.runner, opts.audio);
   const audioTrackId = resolveAudioTrackId(audioTracks, opts.track);
   await ensureWritable(opts.output, { force: opts.force, isTTY: deps.isTTY, confirm: deps.confirm, exists: deps.exists });

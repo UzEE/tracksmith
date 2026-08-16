@@ -73,7 +73,19 @@ test("buildMuxArgs omits --sync at zero delay and forces default-track-flag no w
   expect(args.join(" ")).toContain("--default-track-flag 0:no");
 });
 
-const deps = { isTTY: false, confirm: async () => false, exists: () => false };
+// Inputs exist; the named outputs do not.
+const deps = { isTTY: false, confirm: async () => false, exists: (path: string) => path !== "final.mkv" && path !== "o.mkv" };
+
+test("muxCommand rejects a missing target video before probing or prompting", async () => {
+  const runner = new FakeRunner();
+  await expect(
+    muxCommand(
+      { video: "gone.mkv", audio: "a.mka", delayMs: 0, makeDefault: false, output: "final.mkv", force: false },
+      { ...deps, runner, exists: () => false },
+    ),
+  ).rejects.toThrow(/Input file not found: "gone.mkv"/);
+  expect(runner.calls).toHaveLength(0);
+});
 
 test("muxCommand probes the audio input, resolves the track, and runs mkvmerge", async () => {
   const runner = new FakeRunner();

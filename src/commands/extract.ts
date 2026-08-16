@@ -1,7 +1,7 @@
 import type { CommandDeps } from "../types.ts";
 import { CliError } from "../types.ts";
 import { probeTracks, requireAudioTrack } from "../probe.ts";
-import { defaultExtractOutput, ensureWritable } from "../output.ts";
+import { defaultExtractOutput, ensureWritable, requireInputFile } from "../output.ts";
 
 export function buildExtractArgs(opts: { file: string; track: number; output: string }): string[] {
   return [
@@ -24,6 +24,7 @@ export async function extractCommand(
   opts: { file: string; track: number; output?: string; force: boolean },
   deps: CommandDeps,
 ): Promise<string> {
+  requireInputFile(opts.file, deps.exists);
   const tracks = await probeTracks(deps.runner, opts.file);
   requireAudioTrack(tracks, opts.track);
   const output = opts.output ?? defaultExtractOutput(opts.file, opts.track);

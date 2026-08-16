@@ -85,7 +85,19 @@ test("buildTestClipArgs rejects a delay that would seek before zero", () => {
   ).toThrow(/later --start/);
 });
 
-const deps = { isTTY: false, confirm: async () => false, exists: () => false };
+// Inputs exist; sync-test outputs do not.
+const deps = { isTTY: false, confirm: async () => false, exists: (path: string) => !path.includes(".sync-test.") };
+
+test("testClipCommand rejects a missing input file before probing or prompting", async () => {
+  const runner = new FakeRunner();
+  await expect(
+    testClipCommand(
+      { video: "gone.mkv", audio: "donor.mkv", track: 1, start: "0", duration: "60", delayMs: 0, force: false },
+      { ...deps, runner, exists: () => false },
+    ),
+  ).rejects.toThrow(/Input file not found: "gone.mkv"/);
+  expect(runner.calls).toHaveLength(0);
+});
 
 test("testClipCommand probes the donor, maps the audio-relative index, and runs ffmpeg", async () => {
   const runner = new FakeRunner();

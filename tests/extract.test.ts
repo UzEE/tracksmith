@@ -21,7 +21,8 @@ test("buildExtractArgs keeps only the chosen audio track, stream-copied to MKA",
   ]);
 });
 
-const deps = { isTTY: false, confirm: async () => false, exists: () => false };
+// Inputs (.mkv) exist; outputs (.mka) do not.
+const deps = { isTTY: false, confirm: async () => false, exists: (path: string) => !path.endsWith(".mka") };
 
 test("extractCommand validates the track, applies the default output name, and runs mkvmerge", async () => {
   const runner = new FakeRunner();
@@ -40,6 +41,26 @@ test("extractCommand rejects non-audio tracks before running mkvmerge", async ()
     /not audio/,
   );
   expect(runner.calls).toHaveLength(1); // probe only
+});
+
+test("extractCommand rejects a missing input file before probing or prompting", async () => {
+  const runner = new FakeRunner();
+  let prompted = false;
+  const attempt = extractCommand(
+    { file: "gone.mkv", track: 1, force: false },
+    {
+      runner,
+      isTTY: true,
+      confirm: async () => {
+        prompted = true;
+        return true;
+      },
+      exists: () => false,
+    },
+  );
+  await expect(attempt).rejects.toThrow(/Input file not found/);
+  expect(runner.calls).toHaveLength(0);
+  expect(prompted).toBe(false);
 });
 
 test("extractCommand surfaces mkvmerge failures with exit code and stderr", async () => {
