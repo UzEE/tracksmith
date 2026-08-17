@@ -1,5 +1,6 @@
 import type { Runner, Track } from "./types.ts";
 import { CliError } from "./types.ts";
+import { toolPath } from "./paths.ts";
 
 interface MkvmergeTrack {
   id: number;
@@ -32,7 +33,7 @@ export function parseMkvmergeJson(json: string): Track[] {
 }
 
 export async function probeTracks(runner: Runner, file: string): Promise<Track[]> {
-  const result = await runner.run(["mkvmerge", "-J", file]);
+  const result = await runner.run(["mkvmerge", "-J", toolPath(file)]);
   if (result.exitCode >= 2) {
     throw new CliError(`mkvmerge could not read "${file}" (exit ${result.exitCode}):\n${result.stderr || result.stdout}`);
   }

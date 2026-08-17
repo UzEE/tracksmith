@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import { CliError } from "./types.ts";
 
@@ -23,9 +23,25 @@ export interface OverwriteContext {
   isTTY: boolean;
   confirm: (message: string) => Promise<boolean>;
   exists?: (path: string) => boolean;
+  inputs?: readonly string[];
+}
+
+function sameFile(left: string, right: string): boolean {
+  try {
+    const leftStat = statSync(left, { bigint: true });
+    const rightStat = statSync(right, { bigint: true });
+    return leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino;
+  } catch {
+    return false;
+  }
 }
 
 export async function ensureWritable(path: string, ctx: OverwriteContext): Promise<void> {
+  const aliasedInput = ctx.inputs?.find((input) => sameFile(path, input));
+  if (aliasedInput !== undefined) {
+    throw new CliError(`Output "${path}" is the same file as input "${aliasedInput}". Choose a different output path.`);
+  }
+
   const exists = ctx.exists ?? existsSync;
   if (!exists(path)) return;
   if (ctx.force) return;

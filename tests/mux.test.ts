@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { resolve } from "node:path";
 import { CliError } from "../src/types.ts";
 import { parseMkvmergeJson } from "../src/probe.ts";
 import { buildMuxArgs, muxCommand, resolveAudioTrackId } from "../src/commands/mux.ts";
@@ -56,6 +57,18 @@ test("buildMuxArgs orders audio options after the target and before the audio in
     "2:yes",
     "donor.mkv",
   ]);
+});
+
+test("buildMuxArgs protects MKVToolNix operator-looking audio filenames", () => {
+  const args = buildMuxArgs({
+    video: "target.mkv",
+    audio: "+donor.mka",
+    audioTrackId: 0,
+    delayMs: 0,
+    makeDefault: false,
+    output: "final.mkv",
+  });
+  expect(args.at(-1)).toBe(resolve("+donor.mka"));
 });
 
 test("buildMuxArgs omits --sync at zero delay and forces default-track-flag no without --default", () => {

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { resolve } from "node:path";
 import { CliError } from "../src/types.ts";
 import { audioRelativeIndex, parseMkvmergeJson, probeTracks, requireAudioTrack } from "../src/probe.ts";
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from "./helpers.ts";
@@ -29,6 +30,13 @@ test("probeTracks invokes mkvmerge -J with the file path verbatim", async () => 
   const tracks = await probeTracks(runner, "D:\\media\\a file.mkv");
   expect(runner.calls).toEqual([["mkvmerge", "-J", "D:\\media\\a file.mkv"]]);
   expect(tracks).toHaveLength(4);
+});
+
+test("probeTracks protects option-looking relative filenames", async () => {
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  await probeTracks(runner, "--help");
+  expect(runner.calls[0]).toEqual(["mkvmerge", "-J", resolve("--help")]);
 });
 
 test("probeTracks surfaces the exit code and stderr when mkvmerge cannot read the file", async () => {

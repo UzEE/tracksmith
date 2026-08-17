@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { linkSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CliError } from "../src/types.ts";
 import { defaultExtractOutput, defaultTestClipOutput, ensureWritable, stemPath } from "../src/output.ts";
@@ -48,4 +50,24 @@ test("ensureWritable refuses in non-interactive sessions, suggesting --force", a
   const attempt = ensureWritable("out.mka", { ...base, force: false, isTTY: false });
   await expect(attempt).rejects.toThrow(CliError);
   await expect(attempt).rejects.toThrow(/--force/);
+});
+
+test("ensureWritable refuses when an output is a hard link to an input, even with --force", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "tracksmith-output-"));
+  const input = join(directory, "input.mkv");
+  const output = join(directory, "output.mkv");
+  try {
+    writeFileSync(input, "source media");
+    linkSync(input, output);
+    await expect(
+      ensureWritable(output, {
+        force: true,
+        isTTY: false,
+        confirm: async () => false,
+        inputs: [input],
+      }),
+    ).rejects.toThrow(/same file as input/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

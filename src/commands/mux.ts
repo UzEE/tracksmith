@@ -2,6 +2,7 @@ import type { CommandDeps, Track } from "../types.ts";
 import { CliError } from "../types.ts";
 import { probeTracks, requireAudioTrack } from "../probe.ts";
 import { ensureWritable, requireInputFile } from "../output.ts";
+import { toolPath } from "../paths.ts";
 
 export function resolveAudioTrackId(tracks: Track[], requested: number | undefined): number {
   if (requested !== undefined) return requireAudioTrack(tracks, requested).id;
@@ -27,8 +28,8 @@ export function buildMuxArgs(a: {
   const args = [
     "mkvmerge",
     "-o",
-    a.output,
-    a.video,
+    toolPath(a.output),
+    toolPath(a.video),
     "--audio-tracks",
     id,
     "--no-video",
@@ -42,7 +43,7 @@ export function buildMuxArgs(a: {
   if (a.language !== undefined) args.push("--language", `${id}:${a.language}`);
   if (a.trackName !== undefined) args.push("--track-name", `${id}:${a.trackName}`);
   args.push("--default-track-flag", `${id}:${a.makeDefault ? "yes" : "no"}`);
-  args.push(a.audio);
+  args.push(toolPath(a.audio));
   return args;
 }
 
@@ -64,7 +65,13 @@ export async function muxCommand(
   requireInputFile(opts.audio, deps.exists);
   const audioTracks = await probeTracks(deps.runner, opts.audio);
   const audioTrackId = resolveAudioTrackId(audioTracks, opts.track);
-  await ensureWritable(opts.output, { force: opts.force, isTTY: deps.isTTY, confirm: deps.confirm, exists: deps.exists });
+  await ensureWritable(opts.output, {
+    force: opts.force,
+    isTTY: deps.isTTY,
+    confirm: deps.confirm,
+    exists: deps.exists,
+    inputs: [opts.video, opts.audio],
+  });
   const result = await deps.runner.run(
     buildMuxArgs({
       video: opts.video,
