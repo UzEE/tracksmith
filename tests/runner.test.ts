@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { BunRunner } from "../src/runner.ts";
+import { CliError } from "../src/types.ts";
 
 test("BunRunner captures stdout, stderr, and exit code", async () => {
   const runner = new BunRunner();
@@ -11,6 +12,13 @@ test("BunRunner captures stdout, stderr, and exit code", async () => {
   expect(result.stdout.trim()).toBe("out");
   expect(result.stderr.trim()).toBe("err");
   expect(result.exitCode).toBe(3);
+});
+
+test("BunRunner wraps process-start failures in a CliError", async () => {
+  const runner = new BunRunner();
+  const attempt = runner.run(["tracksmith-command-that-does-not-exist-38b9b8d8"]);
+  await expect(attempt).rejects.toThrow(CliError);
+  await expect(attempt).rejects.toThrow(/Could not start/);
 });
 
 test("BunRunner passes argv entries through verbatim (spaces intact)", async () => {

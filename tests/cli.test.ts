@@ -31,6 +31,14 @@ test("unknown command exits 1", async () => {
   expect(await runCli(["frobnicate"], makeDeps(new FakeRunner()), () => {})).toBe(1);
 });
 
+test("inspect and extract reject extra positional arguments", async () => {
+  const runner = new FakeRunner();
+  const deps = makeDeps(runner);
+  expect(await runCli(["inspect", "movie.mkv", "extra.mkv"], deps, () => {})).toBe(1);
+  expect(await runCli(["extract", "movie.mkv", "extra.mkv", "--track", "1"], deps, () => {})).toBe(1);
+  expect(runner.calls).toHaveLength(0);
+});
+
 test("inspect prints the track table", async () => {
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });

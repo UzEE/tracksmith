@@ -39,6 +39,12 @@ function parseTrack(value: string | undefined): number {
   return track;
 }
 
+function requireFilePositional(positionals: string[], command: "inspect" | "extract"): string {
+  if (positionals.length === 0) throw new CliError(`${command} requires a file argument.`);
+  if (positionals.length > 1) throw new CliError(`${command} accepts exactly one file argument.`);
+  return positionals[0]!;
+}
+
 // Wraps a parseArgs call so parse failures become CliErrors. Takes a thunk
 // (rather than the options object) so parseArgs keeps its precise generic
 // inference over each command's inline options literal.
@@ -89,8 +95,7 @@ export async function runCli(
         const { positionals } = parseOrCliError(() =>
           parseArgs({ args: rest, options: {}, allowPositionals: true, strict: true }),
         );
-        const file = positionals[0];
-        if (!file) throw new CliError("inspect requires a file argument.");
+        const file = requireFilePositional(positionals, "inspect");
         requireTools(["mkvmerge"], deps.which);
         stdout(await inspectCommand(file, deps));
         return 0;
@@ -108,8 +113,7 @@ export async function runCli(
             strict: true,
           }),
         );
-        const file = positionals[0];
-        if (!file) throw new CliError("extract requires a file argument.");
+        const file = requireFilePositional(positionals, "extract");
         requireTools(["mkvmerge"], deps.which);
         const output = await extractCommand(
           { file, track: parseTrack(values.track), output: values.output, force: values.force ?? false },
