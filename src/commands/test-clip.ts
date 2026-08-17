@@ -2,6 +2,7 @@ import type { CommandDeps } from "../types.ts";
 import { CliError } from "../types.ts";
 import { audioRelativeIndex, probeTracks, requireAudioTrack } from "../probe.ts";
 import { defaultTestClipOutput, ensureWritable, requireInputFile } from "../output.ts";
+import { toolPath } from "../paths.ts";
 
 export function parseTimeToSeconds(value: string): number {
   if (/^\d+(\.\d+)?$/.test(value)) return Number(value);
@@ -19,12 +20,6 @@ export function buildTestClipArgs(a: {
   delayMs: number;
   output: string;
 }): string[] {
-  const audioSeek = a.startSeconds - a.delayMs / 1000;
-  if (audioSeek < 0) {
-    throw new CliError(
-      `--start ${a.startSeconds}s with --delay-ms ${a.delayMs} would seek before the file begins; pick a later --start.`,
-    );
-  }
   // -y is safe: our own overwrite policy (ensureWritable) has already run.
   return [
     "ffmpeg",
@@ -32,20 +27,20 @@ export function buildTestClipArgs(a: {
     "-nostdin",
     "-ss",
     String(a.startSeconds),
-    "-t",
-    String(a.durationSeconds),
     "-i",
-    a.video,
+    toolPath(a.video),
+    "-itsoffset",
+    String(a.delayMs / 1000),
     "-ss",
-    String(audioSeek),
-    "-t",
-    String(a.durationSeconds),
+    String(a.startSeconds),
     "-i",
-    a.audio,
+    toolPath(a.audio),
     "-map",
     "0:v:0",
     "-map",
     `1:a:${a.audioStreamIndex}`,
+    "-t",
+    String(a.durationSeconds),
     "-c:v",
     "libx264",
     "-preset",
@@ -55,8 +50,10 @@ export function buildTestClipArgs(a: {
     "-c:a",
     "copy",
     "-sn",
+    "-abort_on",
+    "empty_output_stream",
     "-y",
-    a.output,
+    toolPath(a.output),
   ];
 }
 
@@ -75,17 +72,26 @@ export async function testClipCommand(
 ): Promise<string> {
   requireInputFile(opts.video, deps.exists);
   requireInputFile(opts.audio, deps.exists);
+  const startSeconds = parseTimeToSeconds(opts.start);
+  const durationSeconds = parseTimeToSeconds(opts.duration);
+  if (durationSeconds <= 0) throw new CliError("--duration must be greater than zero.");
   const donorTracks = await probeTracks(deps.runner, opts.audio);
   requireAudioTrack(donorTracks, opts.track);
   const output = opts.output ?? defaultTestClipOutput(opts.video);
-  await ensureWritable(output, { force: opts.force, isTTY: deps.isTTY, confirm: deps.confirm, exists: deps.exists });
+  await ensureWritable(output, {
+    force: opts.force,
+    isTTY: deps.isTTY,
+    confirm: deps.confirm,
+    exists: deps.exists,
+    inputs: [opts.video, opts.audio],
+  });
   const result = await deps.runner.run(
     buildTestClipArgs({
       video: opts.video,
       audio: opts.audio,
       audioStreamIndex: audioRelativeIndex(donorTracks, opts.track),
-      startSeconds: parseTimeToSeconds(opts.start),
-      durationSeconds: parseTimeToSeconds(opts.duration),
+      startSeconds,
+      durationSeconds,
       delayMs: opts.delayMs,
       output,
     }),

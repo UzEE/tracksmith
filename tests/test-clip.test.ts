@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { resolve } from "node:path";
 import { CliError } from "../src/types.ts";
 import { buildTestClipArgs, parseTimeToSeconds, testClipCommand } from "../src/commands/test-clip.ts";
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from "./helpers.ts";
@@ -12,7 +13,7 @@ test("parseTimeToSeconds accepts seconds and HH:MM:SS[.ms]", () => {
   expect(() => parseTimeToSeconds("1:99:00")).toThrow(CliError);
 });
 
-test("buildTestClipArgs re-encodes video, copies audio, and offsets the audio seek by the delay", () => {
+test("buildTestClipArgs re-encodes video, copies audio, and delays audio timestamps", () => {
   const args = buildTestClipArgs({
     video: "target movie.mkv",
     audio: "donor.mkv",
@@ -28,20 +29,20 @@ test("buildTestClipArgs re-encodes video, copies audio, and offsets the audio se
     "-nostdin",
     "-ss",
     "600",
-    "-t",
-    "60",
     "-i",
     "target movie.mkv",
+    "-itsoffset",
+    "0.25",
     "-ss",
-    "599.75",
-    "-t",
-    "60",
+    "600",
     "-i",
     "donor.mkv",
     "-map",
     "0:v:0",
     "-map",
     "1:a:1",
+    "-t",
+    "60",
     "-c:v",
     "libx264",
     "-preset",
@@ -51,12 +52,27 @@ test("buildTestClipArgs re-encodes video, copies audio, and offsets the audio se
     "-c:a",
     "copy",
     "-sn",
+    "-abort_on",
+    "empty_output_stream",
     "-y",
     "target movie.sync-test.mkv",
   ]);
 });
 
-test("buildTestClipArgs advances audio for negative delay", () => {
+test("buildTestClipArgs protects option-looking output filenames", () => {
+  const args = buildTestClipArgs({
+    video: "v.mkv",
+    audio: "a.mka",
+    audioStreamIndex: 0,
+    startSeconds: 0,
+    durationSeconds: 30,
+    delayMs: 0,
+    output: "-clip.mkv",
+  });
+  expect(args.at(-1)).toBe(resolve("-clip.mkv"));
+});
+
+test("buildTestClipArgs advances audio timestamps for negative delay", () => {
   const args = buildTestClipArgs({
     video: "v.mkv",
     audio: "a.mkv",
@@ -66,23 +82,21 @@ test("buildTestClipArgs advances audio for negative delay", () => {
     delayMs: -500,
     output: "out.mkv",
   });
-  const audioSeek = args[args.indexOf("-i") + 3]; // second -ss value
-  expect(args).toContain("10.5");
-  expect(audioSeek).toBeDefined();
+  expect(args.slice(args.indexOf("-itsoffset"), args.indexOf("-itsoffset") + 2)).toEqual(["-itsoffset", "-0.5"]);
 });
 
-test("buildTestClipArgs rejects a delay that would seek before zero", () => {
+test("buildTestClipArgs allows positive delay at the beginning of a file", () => {
   expect(() =>
     buildTestClipArgs({
       video: "v.mkv",
       audio: "a.mkv",
       audioStreamIndex: 0,
-      startSeconds: 0.1,
+      startSeconds: 0,
       durationSeconds: 30,
       delayMs: 500,
       output: "out.mkv",
     }),
-  ).toThrow(/later --start/);
+  ).not.toThrow();
 });
 
 // Inputs exist; sync-test outputs do not.
@@ -96,6 +110,17 @@ test("testClipCommand rejects a missing input file before probing or prompting",
       { ...deps, runner, exists: () => false },
     ),
   ).rejects.toThrow(/Input file not found: "gone.mkv"/);
+  expect(runner.calls).toHaveLength(0);
+});
+
+test("testClipCommand rejects zero duration before probing or prompting", async () => {
+  const runner = new FakeRunner();
+  await expect(
+    testClipCommand(
+      { video: "target.mkv", audio: "donor.mkv", track: 1, start: "0", duration: "0", delayMs: 0, force: false },
+      { ...deps, runner },
+    ),
+  ).rejects.toThrow(/--duration must be greater than zero/);
   expect(runner.calls).toHaveLength(0);
 });
 
