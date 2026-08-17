@@ -5,7 +5,9 @@ import { buildExtractArgs, extractCommand } from "../src/commands/extract.ts";
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from "./helpers.ts";
 
 test("buildExtractArgs keeps only the chosen audio track, stream-copied to MKA", () => {
-  expect(buildExtractArgs({ file: "in dir/movie.mkv", track: 2, output: "out dir/movie.track2.mka" })).toEqual([
+  expect(
+    buildExtractArgs({ file: "in dir/movie.mkv", track: 2, output: "out dir/movie.track2.mka" }),
+  ).toEqual([
     "mkvmerge",
     "-o",
     "out dir/movie.track2.mka",
@@ -22,13 +24,20 @@ test("buildExtractArgs keeps only the chosen audio track, stream-copied to MKA",
 });
 
 // Inputs (.mkv) exist; outputs (.mka) do not.
-const deps = { isTTY: false, confirm: async () => false, exists: (path: string) => !path.endsWith(".mka") };
+const deps = {
+  isTTY: false,
+  confirm: async () => false,
+  exists: (path: string) => !path.endsWith(".mka"),
+};
 
 test("extractCommand validates the track, applies the default output name, and runs mkvmerge", async () => {
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON }); // probe
   runner.queue({ exitCode: 0 }); // extract
-  const output = await extractCommand({ file: join("m", "movie.mkv"), track: 2, force: false }, { ...deps, runner });
+  const output = await extractCommand(
+    { file: join("m", "movie.mkv"), track: 2, force: false },
+    { ...deps, runner },
+  );
   expect(output).toBe(join("m", "movie.track2.mka"));
   expect(runner.calls[0]).toEqual(["mkvmerge", "-J", join("m", "movie.mkv")]);
   expect(runner.calls[1]?.[2]).toBe(join("m", "movie.track2.mka"));
@@ -37,9 +46,9 @@ test("extractCommand validates the track, applies the default output name, and r
 test("extractCommand rejects non-audio tracks before running mkvmerge", async () => {
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
-  await expect(extractCommand({ file: "movie.mkv", track: 0, force: false }, { ...deps, runner })).rejects.toThrow(
-    /not audio/,
-  );
+  await expect(
+    extractCommand({ file: "movie.mkv", track: 0, force: false }, { ...deps, runner }),
+  ).rejects.toThrow(/not audio/);
   expect(runner.calls).toHaveLength(1); // probe only
 });
 
@@ -67,7 +76,10 @@ test("extractCommand surfaces mkvmerge failures with exit code and stderr", asyn
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
   runner.queue({ exitCode: 2, stderr: "disk full" });
-  const attempt = extractCommand({ file: "movie.mkv", track: 1, force: false }, { ...deps, runner });
+  const attempt = extractCommand(
+    { file: "movie.mkv", track: 1, force: false },
+    { ...deps, runner },
+  );
   await expect(attempt).rejects.toThrow(CliError);
   await expect(attempt).rejects.toThrow(/disk full/);
 });

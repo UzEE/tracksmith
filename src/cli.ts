@@ -116,7 +116,12 @@ export async function runCli(
         const file = requireFilePositional(positionals, "extract");
         requireTools(["mkvmerge"], deps.which);
         const output = await extractCommand(
-          { file, track: parseTrack(values.track), output: values.output, force: values.force ?? false },
+          {
+            file,
+            track: parseTrack(values.track),
+            output: values.output,
+            force: values.force ?? false,
+          },
           deps,
         );
         stdout(`Wrote ${output}`);
@@ -139,7 +144,8 @@ export async function runCli(
             strict: true,
           }),
         );
-        if (!values.video || !values.audio) throw new CliError("test-clip requires --video and --audio.");
+        if (!values.video || !values.audio)
+          throw new CliError("test-clip requires --video and --audio.");
         if (!values.start) throw new CliError("test-clip requires --start.");
         requireTools(["ffmpeg", "mkvmerge"], deps.which);
         const output = await testClipCommand(
@@ -177,7 +183,8 @@ export async function runCli(
           }),
         );
         if (!values.video || !values.audio) throw new CliError("mux requires --video and --audio.");
-        if (!values.output) throw new CliError("mux requires --output (no default output name for the final file).");
+        if (!values.output)
+          throw new CliError("mux requires --output (no default output name for the final file).");
         requireTools(["mkvmerge"], deps.which);
         const output = await muxCommand(
           {

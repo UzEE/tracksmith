@@ -85,7 +85,9 @@ export async function muxCommand(
     }),
   );
   if (result.exitCode >= 2) {
-    throw new CliError(`mkvmerge failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`);
+    throw new CliError(
+      `mkvmerge failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`,
+    );
   }
   return opts.output;
 }

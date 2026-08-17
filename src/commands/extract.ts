@@ -36,9 +36,13 @@ export async function extractCommand(
     exists: deps.exists,
     inputs: [opts.file],
   });
-  const result = await deps.runner.run(buildExtractArgs({ file: opts.file, track: opts.track, output }));
+  const result = await deps.runner.run(
+    buildExtractArgs({ file: opts.file, track: opts.track, output }),
+  );
   if (result.exitCode >= 2) {
-    throw new CliError(`mkvmerge failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`);
+    throw new CliError(
+      `mkvmerge failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`,
+    );
   }
   return output;
 }

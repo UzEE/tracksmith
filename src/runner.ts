@@ -17,7 +17,9 @@ export class BunRunner implements Runner {
       return { exitCode, stdout, stderr };
     } catch (error) {
       const executable = argv[0] ?? "process";
-      throw new CliError(`Could not start ${executable}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new CliError(
+        `Could not start ${executable}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

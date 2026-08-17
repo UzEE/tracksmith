@@ -35,7 +35,9 @@ export function parseMkvmergeJson(json: string): Track[] {
 export async function probeTracks(runner: Runner, file: string): Promise<Track[]> {
   const result = await runner.run(["mkvmerge", "-J", toolPath(file)]);
   if (result.exitCode >= 2) {
-    throw new CliError(`mkvmerge could not read "${file}" (exit ${result.exitCode}):\n${result.stderr || result.stdout}`);
+    throw new CliError(
+      `mkvmerge could not read "${file}" (exit ${result.exitCode}):\n${result.stderr || result.stdout}`,
+    );
   }
   return parseMkvmergeJson(result.stdout);
 }
@@ -48,12 +50,16 @@ function validAudioIds(tracks: Track[]): string {
 export function requireAudioTrack(tracks: Track[], id: number): Track {
   const track = tracks.find((candidate) => candidate.id === id);
   if (!track) throw new CliError(`Track ${id} does not exist. ${validAudioIds(tracks)}`);
-  if (track.type !== "audio") throw new CliError(`Track ${id} is ${track.type}, not audio. ${validAudioIds(tracks)}`);
+  if (track.type !== "audio")
+    throw new CliError(`Track ${id} is ${track.type}, not audio. ${validAudioIds(tracks)}`);
   return track;
 }
 
 export function audioRelativeIndex(tracks: Track[], id: number): number {
-  const index = tracks.filter((track) => track.type === "audio").findIndex((track) => track.id === id);
-  if (index === -1) throw new CliError(`Track ${id} is not an audio track. ${validAudioIds(tracks)}`);
+  const index = tracks
+    .filter((track) => track.type === "audio")
+    .findIndex((track) => track.id === id);
+  if (index === -1)
+    throw new CliError(`Track ${id} is not an audio track. ${validAudioIds(tracks)}`);
   return index;
 }

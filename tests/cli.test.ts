@@ -35,7 +35,9 @@ test("inspect and extract reject extra positional arguments", async () => {
   const runner = new FakeRunner();
   const deps = makeDeps(runner);
   expect(await runCli(["inspect", "movie.mkv", "extra.mkv"], deps, () => {})).toBe(1);
-  expect(await runCli(["extract", "movie.mkv", "extra.mkv", "--track", "1"], deps, () => {})).toBe(1);
+  expect(await runCli(["extract", "movie.mkv", "extra.mkv", "--track", "1"], deps, () => {})).toBe(
+    1,
+  );
   expect(runner.calls).toHaveLength(0);
 });
 
@@ -59,7 +61,9 @@ test("extract runs probe then mkvmerge and reports the output", async () => {
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
   runner.queue({ exitCode: 0 });
   const out = capture();
-  expect(await runCli(["extract", "movie.mkv", "--track", "2"], makeDeps(runner), out.write)).toBe(0);
+  expect(await runCli(["extract", "movie.mkv", "--track", "2"], makeDeps(runner), out.write)).toBe(
+    0,
+  );
   expect(runner.calls).toHaveLength(2);
   expect(out.lines.join("\n")).toContain("movie.track2.mka");
 });
@@ -106,5 +110,11 @@ test("negative delay is accepted in space form", async () => {
 });
 
 test("mux requires --output", async () => {
-  expect(await runCli(["mux", "--video", "t.mkv", "--audio", "a.mka"], makeDeps(new FakeRunner()), () => {})).toBe(1);
+  expect(
+    await runCli(
+      ["mux", "--video", "t.mkv", "--audio", "a.mka"],
+      makeDeps(new FakeRunner()),
+      () => {},
+    ),
+  ).toBe(1);
 });

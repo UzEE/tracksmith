@@ -7,7 +7,9 @@ import { FakeRunner, SAMPLE_MKVMERGE_JSON } from "./helpers.ts";
 
 const SINGLE_AUDIO_MKA = JSON.stringify({
   container: { type: "Matroska" },
-  tracks: [{ id: 0, type: "audio", codec: "E-AC-3", properties: { language: "eng", audio_channels: 8 } }],
+  tracks: [
+    { id: 0, type: "audio", codec: "E-AC-3", properties: { language: "eng", audio_channels: 8 } },
+  ],
 });
 
 test("resolveAudioTrackId uses the only audio track when --track is omitted", () => {
@@ -15,7 +17,9 @@ test("resolveAudioTrackId uses the only audio track when --track is omitted", ()
 });
 
 test("resolveAudioTrackId requires --track when several audio tracks exist", () => {
-  expect(() => resolveAudioTrackId(parseMkvmergeJson(SAMPLE_MKVMERGE_JSON), undefined)).toThrow(/--track/);
+  expect(() => resolveAudioTrackId(parseMkvmergeJson(SAMPLE_MKVMERGE_JSON), undefined)).toThrow(
+    /--track/,
+  );
 });
 
 test("resolveAudioTrackId validates an explicit id", () => {
@@ -87,13 +91,24 @@ test("buildMuxArgs omits --sync at zero delay and forces default-track-flag no w
 });
 
 // Inputs exist; the named outputs do not.
-const deps = { isTTY: false, confirm: async () => false, exists: (path: string) => path !== "final.mkv" && path !== "o.mkv" };
+const deps = {
+  isTTY: false,
+  confirm: async () => false,
+  exists: (path: string) => path !== "final.mkv" && path !== "o.mkv",
+};
 
 test("muxCommand rejects a missing target video before probing or prompting", async () => {
   const runner = new FakeRunner();
   await expect(
     muxCommand(
-      { video: "gone.mkv", audio: "a.mka", delayMs: 0, makeDefault: false, output: "final.mkv", force: false },
+      {
+        video: "gone.mkv",
+        audio: "a.mka",
+        delayMs: 0,
+        makeDefault: false,
+        output: "final.mkv",
+        force: false,
+      },
       { ...deps, runner, exists: () => false },
     ),
   ).rejects.toThrow(/Input file not found: "gone.mkv"/);
@@ -105,7 +120,14 @@ test("muxCommand probes the audio input, resolves the track, and runs mkvmerge",
   runner.queue({ stdout: SINGLE_AUDIO_MKA }); // probe audio input
   runner.queue({ exitCode: 0 }); // mux
   const output = await muxCommand(
-    { video: "target.mkv", audio: "movie.track2.mka", delayMs: 0, makeDefault: false, output: "final.mkv", force: false },
+    {
+      video: "target.mkv",
+      audio: "movie.track2.mka",
+      delayMs: 0,
+      makeDefault: false,
+      output: "final.mkv",
+      force: false,
+    },
     { ...deps, runner },
   );
   expect(output).toBe("final.mkv");
@@ -120,7 +142,14 @@ test("muxCommand surfaces mkvmerge failures", async () => {
   runner.queue({ exitCode: 2, stderr: "container error" });
   await expect(
     muxCommand(
-      { video: "t.mkv", audio: "a.mka", delayMs: 0, makeDefault: false, output: "o.mkv", force: false },
+      {
+        video: "t.mkv",
+        audio: "a.mka",
+        delayMs: 0,
+        makeDefault: false,
+        output: "o.mkv",
+        force: false,
+      },
       { ...deps, runner },
     ),
   ).rejects.toThrow(/container error/);

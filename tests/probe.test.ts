@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { CliError } from "../src/types.ts";
-import { audioRelativeIndex, parseMkvmergeJson, probeTracks, requireAudioTrack } from "../src/probe.ts";
+import {
+  audioRelativeIndex,
+  parseMkvmergeJson,
+  probeTracks,
+  requireAudioTrack,
+} from "../src/probe.ts";
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from "./helpers.ts";
 
 test("parseMkvmergeJson maps mkvmerge fields onto Track", () => {

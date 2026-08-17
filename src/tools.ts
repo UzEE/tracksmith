@@ -15,13 +15,18 @@ export function installHint(tool: ToolName): string {
   return INSTALL_HINTS[tool];
 }
 
-export function findMissingTools(needed: readonly ToolName[], which: WhichFn = Bun.which): ToolName[] {
+export function findMissingTools(
+  needed: readonly ToolName[],
+  which: WhichFn = Bun.which,
+): ToolName[] {
   return needed.filter((tool) => which(tool) === null);
 }
 
 export function requireTools(needed: readonly ToolName[], which: WhichFn = Bun.which): void {
   const missing = findMissingTools(needed, which);
   if (missing.length === 0) return;
-  const lines = missing.map((tool) => `  ${tool}: not found on PATH. Install: ${installHint(tool)}`);
+  const lines = missing.map(
+    (tool) => `  ${tool}: not found on PATH. Install: ${installHint(tool)}`,
+  );
   throw new CliError(`Missing required tools:\n${lines.join("\n")}`);
 }

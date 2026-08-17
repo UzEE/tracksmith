@@ -7,7 +7,8 @@ import { toolPath } from "../paths.ts";
 export function parseTimeToSeconds(value: string): number {
   if (/^\d+(\.\d+)?$/.test(value)) return Number(value);
   const match = /^(\d+):([0-5]?\d):([0-5]?\d(?:\.\d+)?)$/.exec(value);
-  if (!match) throw new CliError(`Invalid time "${value}". Use seconds (90 or 90.5) or HH:MM:SS[.ms].`);
+  if (!match)
+    throw new CliError(`Invalid time "${value}". Use seconds (90 or 90.5) or HH:MM:SS[.ms].`);
   return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 }
 
@@ -97,7 +98,9 @@ export async function testClipCommand(
     }),
   );
   if (result.exitCode !== 0) {
-    throw new CliError(`ffmpeg failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`);
+    throw new CliError(
+      `ffmpeg failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`,
+    );
   }
   return output;
 }

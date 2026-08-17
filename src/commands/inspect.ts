@@ -16,7 +16,12 @@ export function formatTrackTable(tracks: Track[]): string {
   const all = [header, ...rows];
   const widths = header.map((_, column) => Math.max(...all.map((row) => row[column]!.length)));
   return all
-    .map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd())
+    .map((row) =>
+      row
+        .map((cell, column) => cell.padEnd(widths[column]!))
+        .join("  ")
+        .trimEnd(),
+    )
     .join("\n");
 }
 

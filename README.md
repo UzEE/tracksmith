@@ -77,8 +77,12 @@ If an output already exists, an interactive terminal asks for confirmation with 
 ## Local development
 
 ```powershell
-bun install
+vp install
 bun test
-bun run typecheck
+vp check
 bun run src/cli.ts <command>
 ```
+
+Vite+ delegates dependency installation to Bun. `vp check` runs Oxfmt,
+Oxlint, and TypeScript 7 together; use `vp check --fix` to apply safe formatting
+and lint fixes.

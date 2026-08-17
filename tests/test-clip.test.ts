@@ -1,7 +1,11 @@
 import { expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { CliError } from "../src/types.ts";
-import { buildTestClipArgs, parseTimeToSeconds, testClipCommand } from "../src/commands/test-clip.ts";
+import {
+  buildTestClipArgs,
+  parseTimeToSeconds,
+  testClipCommand,
+} from "../src/commands/test-clip.ts";
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from "./helpers.ts";
 
 test("parseTimeToSeconds accepts seconds and HH:MM:SS[.ms]", () => {
@@ -82,7 +86,10 @@ test("buildTestClipArgs advances audio timestamps for negative delay", () => {
     delayMs: -500,
     output: "out.mkv",
   });
-  expect(args.slice(args.indexOf("-itsoffset"), args.indexOf("-itsoffset") + 2)).toEqual(["-itsoffset", "-0.5"]);
+  expect(args.slice(args.indexOf("-itsoffset"), args.indexOf("-itsoffset") + 2)).toEqual([
+    "-itsoffset",
+    "-0.5",
+  ]);
 });
 
 test("buildTestClipArgs allows positive delay at the beginning of a file", () => {
@@ -100,13 +107,25 @@ test("buildTestClipArgs allows positive delay at the beginning of a file", () =>
 });
 
 // Inputs exist; sync-test outputs do not.
-const deps = { isTTY: false, confirm: async () => false, exists: (path: string) => !path.includes(".sync-test.") };
+const deps = {
+  isTTY: false,
+  confirm: async () => false,
+  exists: (path: string) => !path.includes(".sync-test."),
+};
 
 test("testClipCommand rejects a missing input file before probing or prompting", async () => {
   const runner = new FakeRunner();
   await expect(
     testClipCommand(
-      { video: "gone.mkv", audio: "donor.mkv", track: 1, start: "0", duration: "60", delayMs: 0, force: false },
+      {
+        video: "gone.mkv",
+        audio: "donor.mkv",
+        track: 1,
+        start: "0",
+        duration: "60",
+        delayMs: 0,
+        force: false,
+      },
       { ...deps, runner, exists: () => false },
     ),
   ).rejects.toThrow(/Input file not found: "gone.mkv"/);
@@ -117,7 +136,15 @@ test("testClipCommand rejects zero duration before probing or prompting", async 
   const runner = new FakeRunner();
   await expect(
     testClipCommand(
-      { video: "target.mkv", audio: "donor.mkv", track: 1, start: "0", duration: "0", delayMs: 0, force: false },
+      {
+        video: "target.mkv",
+        audio: "donor.mkv",
+        track: 1,
+        start: "0",
+        duration: "0",
+        delayMs: 0,
+        force: false,
+      },
       { ...deps, runner },
     ),
   ).rejects.toThrow(/--duration must be greater than zero/);
@@ -129,7 +156,15 @@ test("testClipCommand probes the donor, maps the audio-relative index, and runs 
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON }); // probe donor
   runner.queue({ exitCode: 0 }); // ffmpeg
   const output = await testClipCommand(
-    { video: "target.mkv", audio: "donor.mkv", track: 2, start: "600", duration: "60", delayMs: 0, force: false },
+    {
+      video: "target.mkv",
+      audio: "donor.mkv",
+      track: 2,
+      start: "600",
+      duration: "60",
+      delayMs: 0,
+      force: false,
+    },
     { ...deps, runner },
   );
   expect(output).toBe("target.sync-test.mkv");
@@ -145,7 +180,15 @@ test("testClipCommand surfaces ffmpeg failures", async () => {
   runner.queue({ exitCode: 1, stderr: "encoder error" });
   await expect(
     testClipCommand(
-      { video: "t.mkv", audio: "d.mkv", track: 1, start: "0", duration: "60", delayMs: 0, force: false },
+      {
+        video: "t.mkv",
+        audio: "d.mkv",
+        track: 1,
+        start: "0",
+        duration: "60",
+        delayMs: 0,
+        force: false,
+      },
       { ...deps, runner },
     ),
   ).rejects.toThrow(/encoder error/);

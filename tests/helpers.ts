@@ -22,14 +22,29 @@ export const SAMPLE_MKVMERGE_JSON = JSON.stringify({
       id: 1,
       type: "audio",
       codec: "AC-3",
-      properties: { language: "eng", track_name: "Surround 5.1", audio_channels: 6, default_track: true },
+      properties: {
+        language: "eng",
+        track_name: "Surround 5.1",
+        audio_channels: 6,
+        default_track: true,
+      },
     },
     {
       id: 2,
       type: "audio",
       codec: "E-AC-3",
-      properties: { language: "eng", track_name: "TrueHD companion", audio_channels: 8, default_track: false },
+      properties: {
+        language: "eng",
+        track_name: "TrueHD companion",
+        audio_channels: 8,
+        default_track: false,
+      },
     },
-    { id: 3, type: "subtitles", codec: "SubRip/SRT", properties: { language: "eng", default_track: false } },
+    {
+      id: 3,
+      type: "subtitles",
+      codec: "SubRip/SRT",
+      properties: { language: "eng", default_track: false },
+    },
   ],
 });
