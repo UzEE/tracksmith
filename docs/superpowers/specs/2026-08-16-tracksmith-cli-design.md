@@ -114,7 +114,7 @@ Each command module has one job: turn validated options into an argv array and h
   - `mkvmerge -J` JSON parsing and track validation in `probe.ts`.
   - Default output naming and overwrite policy in `output.ts`.
   - Achieved by passing a fake runner that records argv instead of spawning.
-- Optional integration tests run only when the three executables and tiny fixture files are present; skipped otherwise.
+- Optional integration tests run only when both executables and tiny fixture files are present; skipped otherwise.
 - Manual verification order: Windows PowerShell first, then at least one Unix platform. Cases: paths with spaces, negative delays, missing tools, invalid track IDs, subprocess failures, overwrite refusal/prompt/--force.
 
 ## Out of scope for v1

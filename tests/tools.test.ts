@@ -33,7 +33,9 @@ test("install hints cover Windows, macOS, and Linux", () => {
   for (const tool of ["ffmpeg", "mkvmerge"] as const) {
     const hint = installHint(tool);
     expect(hint).toContain("winget");
+    expect(hint).toContain("scoop");
     expect(hint).toContain("brew");
     expect(hint).toContain("apt");
+    expect(hint).toContain("pacman");
   }
 });
