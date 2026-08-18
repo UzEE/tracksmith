@@ -1,6 +1,7 @@
-import { existsSync, statSync } from "node:fs";
-import { basename, dirname, extname, join } from "node:path";
-import { CliError } from "./types.ts";
+import { existsSync, statSync } from 'node:fs';
+import { basename, dirname, extname, join } from 'node:path';
+
+import { CliError } from './types.ts';
 
 export function stemPath(file: string): string {
   return join(dirname(file), basename(file, extname(file)));
@@ -16,7 +17,7 @@ export function defaultTestClipOutput(video: string): string {
 
 export function requireInputFile(
   path: string,
-  exists: (path: string) => boolean = existsSync,
+  exists: (path: string) => boolean = existsSync
 ): void {
   if (!exists(path)) throw new CliError(`Input file not found: "${path}".`);
 }
@@ -43,7 +44,7 @@ export async function ensureWritable(path: string, ctx: OverwriteContext): Promi
   const aliasedInput = ctx.inputs?.find((input) => sameFile(path, input));
   if (aliasedInput !== undefined) {
     throw new CliError(
-      `Output "${path}" is the same file as input "${aliasedInput}". Choose a different output path.`,
+      `Output "${path}" is the same file as input "${aliasedInput}". Choose a different output path.`
     );
   }
 
@@ -52,9 +53,9 @@ export async function ensureWritable(path: string, ctx: OverwriteContext): Promi
   if (ctx.force) return;
   if (!ctx.isTTY) {
     throw new CliError(
-      `Output "${path}" already exists. Pass --force to overwrite (cannot prompt in a non-interactive session).`,
+      `Output "${path}" already exists. Pass --force to overwrite (cannot prompt in a non-interactive session).`
     );
   }
   const approved = await ctx.confirm(`Output "${path}" already exists. Overwrite?`);
-  if (!approved) throw new CliError("Aborted: existing output left untouched.");
+  if (!approved) throw new CliError('Aborted: existing output left untouched.');
 }
