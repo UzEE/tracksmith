@@ -1,13 +1,15 @@
-import type { CommandDeps } from "../types.ts";
-import { CliError } from "../types.ts";
-import { audioRelativeIndex, probeTracks, requireAudioTrack } from "../probe.ts";
-import { defaultTestClipOutput, ensureWritable, requireInputFile } from "../output.ts";
-import { toolPath } from "../paths.ts";
+import type { CommandDeps } from '../types.ts';
+
+import { defaultTestClipOutput, ensureWritable, requireInputFile } from '../output.ts';
+import { toolPath } from '../paths.ts';
+import { audioRelativeIndex, probeTracks, requireAudioTrack } from '../probe.ts';
+import { CliError } from '../types.ts';
 
 export function parseTimeToSeconds(value: string): number {
   if (/^\d+(\.\d+)?$/.test(value)) return Number(value);
   const match = /^(\d+):([0-5]?\d):([0-5]?\d(?:\.\d+)?)$/.exec(value);
-  if (!match) throw new CliError(`Invalid time "${value}". Use seconds (90 or 90.5) or HH:MM:SS[.ms].`);
+  if (!match)
+    throw new CliError(`Invalid time "${value}". Use seconds (90 or 90.5) or HH:MM:SS[.ms].`);
   return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 }
 
@@ -22,38 +24,38 @@ export function buildTestClipArgs(a: {
 }): string[] {
   // -y is safe: our own overwrite policy (ensureWritable) has already run.
   return [
-    "ffmpeg",
-    "-hide_banner",
-    "-nostdin",
-    "-ss",
+    'ffmpeg',
+    '-hide_banner',
+    '-nostdin',
+    '-ss',
     String(a.startSeconds),
-    "-i",
+    '-i',
     toolPath(a.video),
-    "-itsoffset",
+    '-itsoffset',
     String(a.delayMs / 1000),
-    "-ss",
+    '-ss',
     String(a.startSeconds),
-    "-i",
+    '-i',
     toolPath(a.audio),
-    "-map",
-    "0:v:0",
-    "-map",
+    '-map',
+    '0:v:0',
+    '-map',
     `1:a:${a.audioStreamIndex}`,
-    "-t",
+    '-t',
     String(a.durationSeconds),
-    "-c:v",
-    "libx264",
-    "-preset",
-    "veryfast",
-    "-crf",
-    "18",
-    "-c:a",
-    "copy",
-    "-sn",
-    "-abort_on",
-    "empty_output_stream",
-    "-y",
-    toolPath(a.output),
+    '-c:v',
+    'libx264',
+    '-preset',
+    'veryfast',
+    '-crf',
+    '18',
+    '-c:a',
+    'copy',
+    '-sn',
+    '-abort_on',
+    'empty_output_stream',
+    '-y',
+    toolPath(a.output)
   ];
 }
 
@@ -68,13 +70,13 @@ export async function testClipCommand(
     output?: string;
     force: boolean;
   },
-  deps: CommandDeps,
+  deps: CommandDeps
 ): Promise<string> {
   requireInputFile(opts.video, deps.exists);
   requireInputFile(opts.audio, deps.exists);
   const startSeconds = parseTimeToSeconds(opts.start);
   const durationSeconds = parseTimeToSeconds(opts.duration);
-  if (durationSeconds <= 0) throw new CliError("--duration must be greater than zero.");
+  if (durationSeconds <= 0) throw new CliError('--duration must be greater than zero.');
   const donorTracks = await probeTracks(deps.runner, opts.audio);
   requireAudioTrack(donorTracks, opts.track);
   const output = opts.output ?? defaultTestClipOutput(opts.video);
@@ -83,7 +85,7 @@ export async function testClipCommand(
     isTTY: deps.isTTY,
     confirm: deps.confirm,
     exists: deps.exists,
-    inputs: [opts.video, opts.audio],
+    inputs: [opts.video, opts.audio]
   });
   const result = await deps.runner.run(
     buildTestClipArgs({
@@ -93,11 +95,13 @@ export async function testClipCommand(
       startSeconds,
       durationSeconds,
       delayMs: opts.delayMs,
-      output,
-    }),
+      output
+    })
   );
   if (result.exitCode !== 0) {
-    throw new CliError(`ffmpeg failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`);
+    throw new CliError(
+      `ffmpeg failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`
+    );
   }
   return output;
 }

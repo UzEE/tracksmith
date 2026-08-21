@@ -1,8 +1,8 @@
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, resolve } from 'node:path';
 
-const TOOL_OPERATOR_PREFIXES = "-+@=()[]";
+const TOOL_OPERATOR_PREFIXES = '-+@=()[]';
 
 export function toolPath(path: string): string {
-  if (isAbsolute(path) || !TOOL_OPERATOR_PREFIXES.includes(path[0] ?? "")) return path;
+  if (isAbsolute(path) || !TOOL_OPERATOR_PREFIXES.includes(path[0] ?? '')) return path;
   return resolve(path);
 }

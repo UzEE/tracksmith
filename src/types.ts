@@ -21,10 +21,10 @@ export interface Track {
 export class CliError extends Error {
   constructor(
     message: string,
-    readonly exitCode: number = 1,
+    readonly exitCode: number = 1
   ) {
     super(message);
-    this.name = "CliError";
+    this.name = 'CliError';
   }
 }
 

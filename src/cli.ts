@@ -1,13 +1,15 @@
 #!/usr/bin/env bun
-import { parseArgs } from "node:util";
-import type { CommandDeps } from "./types.ts";
-import { CliError } from "./types.ts";
-import { BunRunner } from "./runner.ts";
-import { requireTools } from "./tools.ts";
-import { inspectCommand } from "./commands/inspect.ts";
-import { extractCommand } from "./commands/extract.ts";
-import { testClipCommand } from "./commands/test-clip.ts";
-import { muxCommand } from "./commands/mux.ts";
+import { parseArgs } from 'node:util';
+
+import type { CommandDeps } from './types.ts';
+
+import { extractCommand } from './commands/extract.ts';
+import { inspectCommand } from './commands/inspect.ts';
+import { muxCommand } from './commands/mux.ts';
+import { testClipCommand } from './commands/test-clip.ts';
+import { ProcessRunner } from './runner.ts';
+import { requireTools } from './tools.ts';
+import { CliError } from './types.ts';
 
 const USAGE = `tracksmith — inspect, extract, sync-test, and mux Matroska audio tracks
 
@@ -34,12 +36,12 @@ function parseIntStrict(value: string | undefined, flag: string): number {
 }
 
 function parseTrack(value: string | undefined): number {
-  const track = parseIntStrict(value, "--track");
+  const track = parseIntStrict(value, '--track');
   if (track < 0) throw new CliError(`--track must be >= 0, got ${track}.`);
   return track;
 }
 
-function requireFilePositional(positionals: string[], command: "inspect" | "extract"): string {
+function requireFilePositional(positionals: string[], command: 'inspect' | 'extract'): string {
   if (positionals.length === 0) throw new CliError(`${command} requires a file argument.`);
   if (positionals.length > 1) throw new CliError(`${command} accepts exactly one file argument.`);
   return positionals[0]!;
@@ -63,7 +65,7 @@ function normalizeDelayMs(args: string[]): string[] {
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i]!;
     const next = args[i + 1];
-    if (arg === "--delay-ms" && next !== undefined && /^-\d+$/.test(next)) {
+    if (arg === '--delay-ms' && next !== undefined && /^-\d+$/.test(next)) {
       out.push(`--delay-ms=${next}`);
       i += 1;
     } else {
@@ -76,7 +78,7 @@ function normalizeDelayMs(args: string[]): string[] {
 export async function runCli(
   argv: string[],
   deps: CommandDeps,
-  stdout: (line: string) => void = console.log,
+  stdout: (line: string) => void = console.log
 ): Promise<number> {
   const [command, ...rawRest] = argv;
   const rest = normalizeDelayMs(rawRest);
@@ -86,112 +88,119 @@ export async function runCli(
         stdout(USAGE);
         return 1;
       }
-      case "--help":
-      case "-h": {
+      case '--help':
+      case '-h': {
         stdout(USAGE);
         return 0;
       }
-      case "inspect": {
+      case 'inspect': {
         const { positionals } = parseOrCliError(() =>
-          parseArgs({ args: rest, options: {}, allowPositionals: true, strict: true }),
+          parseArgs({ args: rest, options: {}, allowPositionals: true, strict: true })
         );
-        const file = requireFilePositional(positionals, "inspect");
-        requireTools(["mkvmerge"], deps.which);
+        const file = requireFilePositional(positionals, 'inspect');
+        requireTools(['mkvmerge'], deps.which);
         stdout(await inspectCommand(file, deps));
         return 0;
       }
-      case "extract": {
+      case 'extract': {
         const { values, positionals } = parseOrCliError(() =>
           parseArgs({
             args: rest,
             options: {
-              track: { type: "string" },
-              output: { type: "string" },
-              force: { type: "boolean", default: false },
+              track: { type: 'string' },
+              output: { type: 'string' },
+              force: { type: 'boolean', default: false }
             },
             allowPositionals: true,
-            strict: true,
-          }),
+            strict: true
+          })
         );
-        const file = requireFilePositional(positionals, "extract");
-        requireTools(["mkvmerge"], deps.which);
+        const file = requireFilePositional(positionals, 'extract');
+        requireTools(['mkvmerge'], deps.which);
         const output = await extractCommand(
-          { file, track: parseTrack(values.track), output: values.output, force: values.force ?? false },
-          deps,
+          {
+            file,
+            track: parseTrack(values.track),
+            output: values.output,
+            force: values.force ?? false
+          },
+          deps
         );
         stdout(`Wrote ${output}`);
         return 0;
       }
-      case "test-clip": {
+      case 'test-clip': {
         const { values } = parseOrCliError(() =>
           parseArgs({
             args: rest,
             options: {
-              video: { type: "string" },
-              audio: { type: "string" },
-              track: { type: "string" },
-              start: { type: "string" },
-              duration: { type: "string", default: "60" },
-              "delay-ms": { type: "string", default: "0" },
-              output: { type: "string" },
-              force: { type: "boolean", default: false },
+              video: { type: 'string' },
+              audio: { type: 'string' },
+              track: { type: 'string' },
+              start: { type: 'string' },
+              duration: { type: 'string', default: '60' },
+              'delay-ms': { type: 'string', default: '0' },
+              output: { type: 'string' },
+              force: { type: 'boolean', default: false }
             },
-            strict: true,
-          }),
+            strict: true
+          })
         );
-        if (!values.video || !values.audio) throw new CliError("test-clip requires --video and --audio.");
-        if (!values.start) throw new CliError("test-clip requires --start.");
-        requireTools(["ffmpeg", "mkvmerge"], deps.which);
+        if (!values.video || !values.audio)
+          throw new CliError('test-clip requires --video and --audio.');
+        if (!values.start) throw new CliError('test-clip requires --start.');
+        requireTools(['ffmpeg', 'mkvmerge'], deps.which);
         const output = await testClipCommand(
           {
             video: values.video,
             audio: values.audio,
             track: parseTrack(values.track),
             start: values.start,
-            duration: values.duration ?? "60",
-            delayMs: parseIntStrict(values["delay-ms"] ?? "0", "--delay-ms"),
+            duration: values.duration ?? '60',
+            delayMs: parseIntStrict(values['delay-ms'] ?? '0', '--delay-ms'),
             output: values.output,
-            force: values.force ?? false,
+            force: values.force ?? false
           },
-          deps,
+          deps
         );
         stdout(`Wrote ${output}`);
         return 0;
       }
-      case "mux": {
+      case 'mux': {
         const { values } = parseOrCliError(() =>
           parseArgs({
             args: rest,
             options: {
-              video: { type: "string" },
-              audio: { type: "string" },
-              track: { type: "string" },
-              "delay-ms": { type: "string", default: "0" },
-              language: { type: "string", default: "eng" },
-              name: { type: "string" },
-              default: { type: "boolean", default: false },
-              output: { type: "string" },
-              force: { type: "boolean", default: false },
+              video: { type: 'string' },
+              audio: { type: 'string' },
+              track: { type: 'string' },
+              'delay-ms': { type: 'string', default: '0' },
+              language: { type: 'string', default: 'eng' },
+              name: { type: 'string' },
+              default: { type: 'boolean', default: false },
+              output: { type: 'string' },
+              force: { type: 'boolean', default: false }
             },
-            strict: true,
-          }),
+            strict: true
+          })
         );
-        if (!values.video || !values.audio) throw new CliError("mux requires --video and --audio.");
-        if (!values.output) throw new CliError("mux requires --output (no default output name for the final file).");
-        requireTools(["mkvmerge"], deps.which);
+        if (!values.video || !values.audio) throw new CliError('mux requires --video and --audio.');
+        if (!values.output)
+          throw new CliError('mux requires --output (no default output name for the final file).');
+        requireTools(['mkvmerge'], deps.which);
         const output = await muxCommand(
           {
             video: values.video,
             audio: values.audio,
             track: values.track === undefined ? undefined : parseTrack(values.track),
-            delayMs: parseIntStrict(values["delay-ms"] ?? "0", "--delay-ms"),
+            delayMs: parseIntStrict(values['delay-ms'] ?? '0', '--delay-ms'),
             language: values.language,
             name: values.name,
             makeDefault: values.default ?? false,
             output: values.output,
-            force: values.force ?? false,
+            force: values.force ?? false
           },
-          deps,
+          deps
         );
         stdout(`Wrote ${output}`);
         return 0;
@@ -218,8 +227,8 @@ async function promptYesNo(message: string): Promise<boolean> {
 
 if (import.meta.main) {
   process.exitCode = await runCli(process.argv.slice(2), {
-    runner: new BunRunner(),
-    isTTY: Boolean(process.stdin.isTTY),
-    confirm: promptYesNo,
+    runner: new ProcessRunner(),
+    isTTY: process.stdin.isTTY,
+    confirm: promptYesNo
   });
 }
