@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vite-plus/test';
 
 import { findMissingTools, installHint, requireTools } from '../src/tools.ts';
 import { CliError } from '../src/types.ts';

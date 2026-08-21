@@ -1,5 +1,6 @@
-import { expect, test } from 'bun:test';
 import { resolve } from 'node:path';
+
+import { expect, test } from 'vite-plus/test';
 
 import { buildMuxArgs, muxCommand, resolveAudioTrackId } from '../src/commands/mux.ts';
 import { parseMkvmergeJson } from '../src/probe.ts';

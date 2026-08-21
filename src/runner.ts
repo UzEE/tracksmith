@@ -1,23 +1,38 @@
+import { spawn } from 'node:child_process';
+
 import type { Runner, RunResult } from './types.ts';
 
 import { CliError } from './types.ts';
 
-export class BunRunner implements Runner {
+export class ProcessRunner implements Runner {
   async run(argv: readonly string[]): Promise<RunResult> {
+    const [executable, ...args] = argv;
+    if (executable === undefined) {
+      throw new CliError('Could not start process: missing executable');
+    }
+
     try {
-      const proc = Bun.spawn([...argv], {
-        stdin: 'ignore',
-        stdout: 'pipe',
-        stderr: 'pipe'
+      return await new Promise((resolve, reject) => {
+        const process = spawn(executable, args, {
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+        let stdout = '';
+        let stderr = '';
+
+        process.stdout.setEncoding('utf8');
+        process.stderr.setEncoding('utf8');
+        process.stdout.on('data', (chunk: string) => {
+          stdout += chunk;
+        });
+        process.stderr.on('data', (chunk: string) => {
+          stderr += chunk;
+        });
+        process.once('error', reject);
+        process.once('close', (exitCode) => {
+          resolve({ exitCode: exitCode ?? 1, stdout, stderr });
+        });
       });
-      const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-        proc.exited
-      ]);
-      return { exitCode, stdout, stderr };
     } catch (error) {
-      const executable = argv[0] ?? 'process';
       throw new CliError(
         `Could not start ${executable}: ${error instanceof Error ? error.message : String(error)}`
       );

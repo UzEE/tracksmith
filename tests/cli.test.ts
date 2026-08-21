@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
-
 import type { CommandDeps } from '../src/types.ts';
+
+import { expect, test } from 'vite-plus/test';
 
 import { runCli } from '../src/cli.ts';
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from './helpers.ts';

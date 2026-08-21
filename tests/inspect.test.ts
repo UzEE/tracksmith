@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vite-plus/test';
 
 import { formatTrackTable, inspectCommand } from '../src/commands/inspect.ts';
 import { parseMkvmergeJson } from '../src/probe.ts';

@@ -7,7 +7,7 @@ import { extractCommand } from './commands/extract.ts';
 import { inspectCommand } from './commands/inspect.ts';
 import { muxCommand } from './commands/mux.ts';
 import { testClipCommand } from './commands/test-clip.ts';
-import { BunRunner } from './runner.ts';
+import { ProcessRunner } from './runner.ts';
 import { requireTools } from './tools.ts';
 import { CliError } from './types.ts';
 
@@ -227,7 +227,7 @@ async function promptYesNo(message: string): Promise<boolean> {
 
 if (import.meta.main) {
   process.exitCode = await runCli(process.argv.slice(2), {
-    runner: new BunRunner(),
+    runner: new ProcessRunner(),
     isTTY: process.stdin.isTTY,
     confirm: promptYesNo
   });

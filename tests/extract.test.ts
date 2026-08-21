@@ -1,5 +1,6 @@
-import { expect, test } from 'bun:test';
 import { join } from 'node:path';
+
+import { expect, test } from 'vite-plus/test';
 
 import { buildExtractArgs, extractCommand } from '../src/commands/extract.ts';
 import { CliError } from '../src/types.ts';

@@ -7,7 +7,8 @@
   },
   "type": "module",
   "scripts": {
-    "test": "bun test",
+    "cli": "bun run src/cli.ts",
+    "test": "vp test run",
     "check": "vp check",
     "check:fix": "vp check --fix",
     "lint": "vp lint",

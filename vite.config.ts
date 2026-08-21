@@ -24,12 +24,6 @@ export default defineConfig({
       suspicious: 'warn'
     },
     jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
-    overrides: [
-      {
-        files: ['tests/**/*.ts'],
-        rules: { 'typescript/await-thenable': 'off' }
-      }
-    ],
     plugins: ['eslint', 'oxc', 'typescript', 'unicorn'],
     rules: {
       'eslint/no-unused-vars': [

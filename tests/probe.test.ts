@@ -1,5 +1,6 @@
-import { expect, test } from 'bun:test';
 import { resolve } from 'node:path';
+
+import { expect, test } from 'vite-plus/test';
 
 import {
   audioRelativeIndex,
