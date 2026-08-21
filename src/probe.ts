@@ -20,7 +20,7 @@ const mkvmergeTrackSchema = z.object({
 });
 
 const mkvmergeOutputSchema = z.object({
-  tracks: z.optional(z.array(mkvmergeTrackSchema))
+  tracks: z.array(mkvmergeTrackSchema)
 });
 
 export function parseMkvmergeJson(json: string): Track[] {
@@ -33,7 +33,7 @@ export function parseMkvmergeJson(json: string): Track[] {
   const result = z.safeParse(mkvmergeOutputSchema, parsed);
   if (!result.success) throw new CliError('mkvmerge -J output has an unexpected structure.');
 
-  return (result.data.tracks ?? []).map((track) => ({
+  return result.data.tracks.map((track) => ({
     id: track.id,
     type: track.type,
     codec: track.codec,

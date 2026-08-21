@@ -35,6 +35,10 @@ test('parseMkvmergeJson rejects structurally invalid track data', () => {
   expect(() => parseMkvmergeJson(invalid)).toThrow(CliError);
 });
 
+test('parseMkvmergeJson rejects output without a tracks array', () => {
+  expect(() => parseMkvmergeJson('{}')).toThrow(CliError);
+});
+
 test('probeTracks invokes mkvmerge -J with the file path verbatim', async () => {
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });

@@ -2,7 +2,7 @@ import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
   fmt: {
-    ignorePatterns: ['CLAUDE.md', 'docs/**'],
+    ignorePatterns: ['AGENTS.md', 'CLAUDE.md', 'docs/**'],
     singleQuote: true,
     sortImports: {
       groups: [
@@ -24,6 +24,12 @@ export default defineConfig({
       suspicious: 'warn'
     },
     jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
+    overrides: [
+      {
+        files: ['tests/**/*.ts'],
+        rules: { 'typescript/await-thenable': 'off' }
+      }
+    ],
     plugins: ['eslint', 'oxc', 'typescript', 'unicorn'],
     rules: {
       'eslint/no-unused-vars': [
@@ -33,7 +39,6 @@ export default defineConfig({
           caughtErrors: 'none'
         }
       ],
-      'typescript/await-thenable': 'off',
       'typescript/no-explicit-any': 'error',
       'vite-plus/prefer-vite-plus-imports': 'error'
     },

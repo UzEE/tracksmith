@@ -5,6 +5,7 @@ Tracksmith is a Bun CLI for MKV files. It inspects tracks, extracts an audio tra
 ## Requirements
 
 - [Bun](https://bun.com)
+- [Vite+](https://viteplus.dev/guide/) (`vp`)
 - `ffmpeg` and `mkvmerge` available on `PATH`
 
 `ffmpeg`:
