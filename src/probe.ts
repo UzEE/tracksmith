@@ -1,38 +1,27 @@
 import type { Runner, Track } from './types.ts';
 
+import * as z from 'zod/mini';
+
 import { toolPath } from './paths.ts';
 import { CliError } from './types.ts';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+const mkvmergePropertiesSchema = z.object({
+  language: z.optional(z.string()),
+  track_name: z.optional(z.string()),
+  audio_channels: z.optional(z.number()),
+  default_track: z.optional(z.boolean())
+});
 
-function parseTrack(value: unknown): Track | undefined {
-  if (!isRecord(value)) return undefined;
-  if (typeof value.id !== 'number' || !Number.isInteger(value.id)) return undefined;
-  if (typeof value.type !== 'string' || typeof value.codec !== 'string') return undefined;
+const mkvmergeTrackSchema = z.object({
+  id: z.int(),
+  type: z.string(),
+  codec: z.string(),
+  properties: z.optional(mkvmergePropertiesSchema)
+});
 
-  const properties = value.properties;
-  if (properties !== undefined && !isRecord(properties)) return undefined;
-  if (properties?.language !== undefined && typeof properties.language !== 'string')
-    return undefined;
-  if (properties?.track_name !== undefined && typeof properties.track_name !== 'string')
-    return undefined;
-  if (properties?.audio_channels !== undefined && typeof properties.audio_channels !== 'number')
-    return undefined;
-  if (properties?.default_track !== undefined && typeof properties.default_track !== 'boolean')
-    return undefined;
-
-  return {
-    id: value.id,
-    type: value.type,
-    codec: value.codec,
-    language: properties?.language,
-    name: properties?.track_name,
-    channels: properties?.audio_channels,
-    isDefault: properties?.default_track ?? false
-  };
-}
+const mkvmergeOutputSchema = z.object({
+  tracks: z.optional(z.array(mkvmergeTrackSchema))
+});
 
 export function parseMkvmergeJson(json: string): Track[] {
   let parsed: unknown;
@@ -41,17 +30,18 @@ export function parseMkvmergeJson(json: string): Track[] {
   } catch {
     throw new CliError('Could not parse mkvmerge -J output as JSON.');
   }
-  if (!isRecord(parsed) || (parsed.tracks !== undefined && !Array.isArray(parsed.tracks))) {
-    throw new CliError('mkvmerge -J output has an unexpected structure.');
-  }
+  const result = z.safeParse(mkvmergeOutputSchema, parsed);
+  if (!result.success) throw new CliError('mkvmerge -J output has an unexpected structure.');
 
-  const tracks: Track[] = [];
-  for (const value of parsed.tracks ?? []) {
-    const track = parseTrack(value);
-    if (!track) throw new CliError('mkvmerge -J output has an unexpected track structure.');
-    tracks.push(track);
-  }
-  return tracks;
+  return (result.data.tracks ?? []).map((track) => ({
+    id: track.id,
+    type: track.type,
+    codec: track.codec,
+    language: track.properties?.language,
+    name: track.properties?.track_name,
+    channels: track.properties?.audio_channels,
+    isDefault: track.properties?.default_track ?? false
+  }));
 }
 
 export async function probeTracks(runner: Runner, file: string): Promise<Track[]> {
