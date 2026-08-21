@@ -30,6 +30,11 @@ test('parseMkvmergeJson throws CliError on garbage input', () => {
   expect(() => parseMkvmergeJson('not json')).toThrow(CliError);
 });
 
+test('parseMkvmergeJson rejects structurally invalid track data', () => {
+  const invalid = JSON.stringify({ tracks: [{ id: '1', type: 'audio', codec: 'AAC' }] });
+  expect(() => parseMkvmergeJson(invalid)).toThrow(CliError);
+});
+
 test('probeTracks invokes mkvmerge -J with the file path verbatim', async () => {
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });

@@ -228,7 +228,7 @@ async function promptYesNo(message: string): Promise<boolean> {
 if (import.meta.main) {
   process.exitCode = await runCli(process.argv.slice(2), {
     runner: new BunRunner(),
-    isTTY: Boolean(process.stdin.isTTY),
+    isTTY: process.stdin.isTTY,
     confirm: promptYesNo
   });
 }
