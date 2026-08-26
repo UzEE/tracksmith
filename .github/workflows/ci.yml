@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -27,12 +29,24 @@ jobs:
           cache: false
       - run: vp install --frozen-lockfile
       - name: Require a changeset
-        if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
+        if: >-
+          (github.event_name == 'pull_request' &&
+          (github.head_ref != 'changeset-release/main' ||
+          github.event.pull_request.head.repo.full_name != github.repository)) ||
+          (github.event_name == 'workflow_dispatch' &&
+          github.ref_name != 'changeset-release/main')
         env:
-          HEAD_REF: ${{ github.head_ref }}
-        run: vp run check:changeset "$HEAD_REF" origin/main
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          REPOSITORY: ${{ github.repository }}
+        run: vp run check:changeset "$HEAD_REF" "$HEAD_REPOSITORY" "$REPOSITORY" origin/main
       - name: Validate changesets
-        if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
+        if: >-
+          (github.event_name == 'pull_request' &&
+          (github.head_ref != 'changeset-release/main' ||
+          github.event.pull_request.head.repo.full_name != github.repository)) ||
+          (github.event_name == 'workflow_dispatch' &&
+          github.ref_name != 'changeset-release/main')
         run: vp run changeset status --since origin/main
       - run: vp check
       - run: vp test run

@@ -5,6 +5,8 @@ export const RELEASE_BRANCH = 'changeset-release/main' as const;
 
 export interface ChangesetCheck {
   headRef: string;
+  headRepository: string;
+  repository: string;
   changedPaths: readonly string[];
 }
 
@@ -13,7 +15,13 @@ export function isChangesetMarkdown(path: string): boolean {
 }
 
 export function assertChangesetPresent(check: ChangesetCheck): void {
-  if (check.headRef === RELEASE_BRANCH) return;
+  if (
+    check.headRef === RELEASE_BRANCH &&
+    check.headRepository !== '' &&
+    check.headRepository === check.repository
+  ) {
+    return;
+  }
 
   if (!check.changedPaths.some(isChangesetMarkdown)) {
     throw new Error(
@@ -25,7 +33,7 @@ export function assertChangesetPresent(check: ChangesetCheck): void {
 function changedPathsSince(baseRef: string): readonly string[] {
   const result = spawnSync(
     'git',
-    ['diff', '--name-only', '--diff-filter=ACMR', `${baseRef}...HEAD`, '--', '.changeset'],
+    ['diff', '--name-only', '-z', '--diff-filter=ACMR', `${baseRef}...HEAD`, '--', '.changeset'],
     { encoding: 'utf8' }
   );
 
@@ -39,13 +47,20 @@ function changedPathsSince(baseRef: string): readonly string[] {
     );
   }
 
-  return result.stdout.trim().split(/\r?\n/).filter(Boolean);
+  return result.stdout.split('\0').filter(Boolean);
 }
 
 function main(): void {
   const headRef = process.argv[2] ?? '';
-  const baseRef = process.argv[3] ?? 'origin/main';
-  assertChangesetPresent({ headRef, changedPaths: changedPathsSince(baseRef) });
+  const headRepository = process.argv[3] ?? '';
+  const repository = process.argv[4] ?? '';
+  const baseRef = process.argv[5] ?? 'origin/main';
+  assertChangesetPresent({
+    headRef,
+    headRepository,
+    repository,
+    changedPaths: changedPathsSince(baseRef)
+  });
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
