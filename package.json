@@ -41,6 +41,8 @@
     "cli": "bun run src/tracksmith.ts",
     "build": "bun run scripts/build-package.ts",
     "package:smoke": "bun run scripts/package-smoke.ts",
+    "changeset": "changeset",
+    "version": "changeset version",
     "test": "vp test run",
     "check": "vp check",
     "check:fix": "vp check --fix",
@@ -52,6 +54,8 @@
     "zod": "^4"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "1.0.0",
+    "@changesets/cli": "3.0.1",
     "@types/node": "^22.20.1",
     "typescript": "^7.0.0",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.6",
