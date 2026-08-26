@@ -1,15 +1,17 @@
-import type { Runner, RunResult } from '../src/types.ts';
+import type { RunOptions, Runner, RunResult } from '../src/types.ts';
 
 export class FakeRunner implements Runner {
   calls: string[][] = [];
+  options: (RunOptions | undefined)[] = [];
   private results: RunResult[] = [];
 
   queue(result: Partial<RunResult>): void {
     this.results.push({ exitCode: 0, stdout: '', stderr: '', ...result });
   }
 
-  async run(argv: readonly string[]): Promise<RunResult> {
+  async run(argv: readonly string[], options?: RunOptions): Promise<RunResult> {
     this.calls.push([...argv]);
+    this.options.push(options);
     return this.results.shift() ?? { exitCode: 0, stdout: '', stderr: '' };
   }
 }

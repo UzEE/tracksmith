@@ -85,3 +85,19 @@ test('extractCommand surfaces mkvmerge failures with exit code and stderr', asyn
   await expect(attempt).rejects.toThrow(CliError);
   await expect(attempt).rejects.toThrow(/disk full/);
 });
+
+test('extractCommand streams mkvmerge progress only when attached to a TTY', async () => {
+  const opts = { file: 'movie.mkv', track: 2, force: false };
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON }); // probe
+  runner.queue({ exitCode: 0 }); // extract
+  await extractCommand(opts, { ...deps, runner, isTTY: true });
+  expect(runner.options[0]).toBeUndefined(); // probe stays quiet
+  expect(runner.options[1]).toEqual({ stream: 'stdout' });
+
+  const quiet = new FakeRunner();
+  quiet.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  quiet.queue({ exitCode: 0 });
+  await extractCommand(opts, { ...deps, runner: quiet });
+  expect(quiet.options[1]).toBeUndefined();
+});

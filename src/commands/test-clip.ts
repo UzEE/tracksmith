@@ -96,7 +96,8 @@ export async function testClipCommand(
       durationSeconds,
       delayMs: opts.delayMs,
       output
-    })
+    }),
+    deps.isTTY ? { stream: 'stderr' } : undefined
   );
   if (result.exitCode !== 0) {
     throw new CliError(

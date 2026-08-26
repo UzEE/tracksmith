@@ -156,3 +156,26 @@ test('muxCommand surfaces mkvmerge failures', async () => {
     )
   ).rejects.toThrow(/container error/);
 });
+
+test('muxCommand streams mkvmerge progress only when attached to a TTY', async () => {
+  const opts = {
+    video: 'target.mkv',
+    audio: 'movie.track2.mka',
+    delayMs: 0,
+    makeDefault: false,
+    output: 'final.mkv',
+    force: false
+  };
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SINGLE_AUDIO_MKA }); // probe audio input
+  runner.queue({ exitCode: 0 }); // mux
+  await muxCommand(opts, { ...deps, runner, isTTY: true });
+  expect(runner.options[0]).toBeUndefined(); // probe stays quiet
+  expect(runner.options[1]).toEqual({ stream: 'stdout' });
+
+  const quiet = new FakeRunner();
+  quiet.queue({ stdout: SINGLE_AUDIO_MKA });
+  quiet.queue({ exitCode: 0 });
+  await muxCommand(opts, { ...deps, runner: quiet });
+  expect(quiet.options[1]).toBeUndefined();
+});

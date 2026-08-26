@@ -4,8 +4,12 @@ export interface RunResult {
   stderr: string;
 }
 
+export interface RunOptions {
+  stream?: 'stdout' | 'stderr';
+}
+
 export interface Runner {
-  run(argv: readonly string[]): Promise<RunResult>;
+  run(argv: readonly string[], options?: RunOptions): Promise<RunResult>;
 }
 
 export interface Track {

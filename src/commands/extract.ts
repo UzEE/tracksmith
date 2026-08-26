@@ -38,7 +38,8 @@ export async function extractCommand(
     inputs: [opts.file]
   });
   const result = await deps.runner.run(
-    buildExtractArgs({ file: opts.file, track: opts.track, output })
+    buildExtractArgs({ file: opts.file, track: opts.track, output }),
+    deps.isTTY ? { stream: 'stdout' } : undefined
   );
   if (result.exitCode >= 2) {
     throw new CliError(

@@ -195,3 +195,27 @@ test('testClipCommand surfaces ffmpeg failures', async () => {
     )
   ).rejects.toThrow(/encoder error/);
 });
+
+test('testClipCommand streams ffmpeg progress only when attached to a TTY', async () => {
+  const opts = {
+    video: 'target.mkv',
+    audio: 'donor.mkv',
+    track: 2,
+    start: '600',
+    duration: '60',
+    delayMs: 0,
+    force: false
+  };
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON }); // probe donor
+  runner.queue({ exitCode: 0 }); // ffmpeg
+  await testClipCommand(opts, { ...deps, runner, isTTY: true });
+  expect(runner.options[0]).toBeUndefined(); // probe stays quiet
+  expect(runner.options[1]).toEqual({ stream: 'stderr' });
+
+  const quiet = new FakeRunner();
+  quiet.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  quiet.queue({ exitCode: 0 });
+  await testClipCommand(opts, { ...deps, runner: quiet });
+  expect(quiet.options[1]).toBeUndefined();
+});
