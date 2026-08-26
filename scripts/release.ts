@@ -122,7 +122,7 @@ function isMissingNpmVersion(result: CommandResult): boolean {
 }
 
 function isMissingGithubRelease(result: CommandResult): boolean {
-  return result.stderr.trim().toLowerCase() === 'release not found';
+  return result.stdout.trim() === '' && result.stderr.trim().toLowerCase() === 'release not found';
 }
 
 function parseTagCommit(stdout: string): string {
@@ -133,18 +133,35 @@ function parseTagCommit(stdout: string): string {
   return commit;
 }
 
-function requireRemoteTag(stdout: string, tag: ReleaseTag): void {
+function parseRemoteTagCommit(stdout: string, tag: ReleaseTag): string {
+  const tagRef = `refs/tags/${tag}`;
+  const peeledRef = `${tagRef}^{}`;
   const lines = stdout.trim().split(/\r?\n/);
-  const [object, ref, extra] = lines[0]?.split('\t') ?? [];
-  if (
-    lines.length !== 1 ||
-    object === undefined ||
-    !fullCommitPattern.test(object) ||
-    ref !== `refs/tags/${tag}` ||
-    extra !== undefined
-  ) {
-    throw new Error(`git ls-remote did not return exactly refs/tags/${tag}.`);
+  let tagObject: string | undefined;
+  let peeledCommit: string | undefined;
+
+  for (const line of lines) {
+    const [object, ref, extra] = line.split('\t');
+    if (object === undefined || !fullCommitPattern.test(object) || extra !== undefined) {
+      throw new Error(`git ls-remote returned malformed state for ${tagRef}.`);
+    }
+
+    if (ref === tagRef && tagObject === undefined) {
+      tagObject = object;
+    } else if (ref === peeledRef && peeledCommit === undefined) {
+      peeledCommit = object;
+    } else {
+      throw new Error(`git ls-remote returned ambiguous state for ${tagRef}.`);
+    }
   }
+
+  if (lines.length !== 2 || tagObject === undefined || peeledCommit === undefined) {
+    throw new Error(
+      `git ls-remote did not return one annotated tag and peeled commit for ${tagRef}.`
+    );
+  }
+
+  return peeledCommit;
 }
 
 function parseNpmIntegrity(stdout: string): string {
@@ -186,20 +203,24 @@ export function createCommandReleaseGateway(
       const remoteArgs = [
         'ls-remote',
         '--exit-code',
-        '--refs',
         'origin',
-        `refs/tags/${tag}`
+        `refs/tags/${tag}`,
+        `refs/tags/${tag}^{}`
       ] as const;
       const remoteResult = await run('git', remoteArgs);
       if (remoteResult.exitCode !== 0) {
         if (isMissingRemoteTag(remoteResult)) return null;
         throw commandFailure('git', remoteArgs, remoteResult);
       }
-      requireRemoteTag(remoteResult.stdout, tag);
+      const remoteCommit = parseRemoteTagCommit(remoteResult.stdout, tag);
 
       const localArgs = ['rev-list', '-n', '1', tag] as const;
       const localResult = requireSuccess('git', localArgs, await run('git', localArgs));
-      return parseTagCommit(localResult.stdout);
+      const localCommit = parseTagCommit(localResult.stdout);
+      if (localCommit !== remoteCommit) {
+        throw new Error('The local tag commit does not match the remote tag commit.');
+      }
+      return remoteCommit;
     },
 
     async readNpmIntegrity(name, version) {

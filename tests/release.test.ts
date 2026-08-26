@@ -15,6 +15,7 @@ import {
 } from '../scripts/release.ts';
 
 const commit = '0123456789abcdef0123456789abcdef01234567';
+const tagObject = '1111111111111111111111111111111111111111';
 const integrity = 'sha512-ZXhwZWN0ZWQ=';
 const tarballPath = '/tmp/tracksmith-1.2.3.tgz';
 const metadata = {
@@ -282,7 +283,7 @@ function commandHarness(results: readonly CommandResult[]) {
 describe('command release gateway', () => {
   test('uses the exact read commands and parses successful output', async () => {
     const harness = commandHarness([
-      result(0, `${commit}\trefs/tags/v1.2.3\n`),
+      result(0, `${tagObject}\trefs/tags/v1.2.3\n${commit}\trefs/tags/v1.2.3^{}\n`),
       result(0, `${commit}\n`),
       result(0, `"${integrity}"\n`),
       result(0, '{"tagName":"v1.2.3"}\n')
@@ -297,7 +298,7 @@ describe('command release gateway', () => {
     expect(harness.invocations).toEqual([
       {
         command: 'git',
-        args: ['ls-remote', '--exit-code', '--refs', 'origin', 'refs/tags/v1.2.3']
+        args: ['ls-remote', '--exit-code', 'origin', 'refs/tags/v1.2.3', 'refs/tags/v1.2.3^{}']
       },
       { command: 'git', args: ['rev-list', '-n', '1', 'v1.2.3'] },
       {
@@ -308,6 +309,43 @@ describe('command release gateway', () => {
         command: 'gh',
         args: ['release', 'view', 'v1.2.3', '--json', 'tagName']
       }
+    ]);
+  });
+
+  test('throws before writes when remote and local tag commits differ', async () => {
+    const remoteCommit = '2222222222222222222222222222222222222222';
+    const harness = commandHarness([
+      result(0, `${tagObject}\trefs/tags/v1.2.3\n${remoteCommit}\trefs/tags/v1.2.3^{}\n`),
+      result(0, `${commit}\n`)
+    ]);
+    const commandGateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
+    const writes: string[] = [];
+    const gateway: ReleaseGateway = {
+      readTagCommit: (tag) => commandGateway.readTagCommit(tag),
+      readNpmIntegrity: () => Promise.resolve(null),
+      githubReleaseExists: () => Promise.resolve(false),
+      createAndPushTag: () => {
+        writes.push('tag');
+        return Promise.resolve();
+      },
+      publishTarball: () => {
+        writes.push('npm');
+        return Promise.resolve();
+      },
+      createGithubRelease: () => {
+        writes.push('github');
+        return Promise.resolve();
+      }
+    };
+
+    await expect(executeRelease(input(), gateway)).rejects.toThrow('remote tag commit');
+    expect(writes).toEqual([]);
+    expect(harness.invocations).toEqual([
+      {
+        command: 'git',
+        args: ['ls-remote', '--exit-code', 'origin', 'refs/tags/v1.2.3', 'refs/tags/v1.2.3^{}']
+      },
+      { command: 'git', args: ['rev-list', '-n', '1', 'v1.2.3'] }
     ]);
   });
 
@@ -347,10 +385,19 @@ describe('command release gateway', () => {
     await expect(invoke(gateway)).rejects.toThrow();
   });
 
-  test('does not classify a compound GitHub failure as release-not-found', async () => {
-    const harness = commandHarness([
-      result(1, '', 'release not found\nHTTP 503: Service Unavailable\n')
-    ]);
+  test.each([
+    {
+      name: 'extra stderr',
+      stdout: '',
+      stderr: 'release not found\nHTTP 503: Service Unavailable\n'
+    },
+    {
+      name: 'non-empty stdout',
+      stdout: 'HTTP 503: Service Unavailable\n',
+      stderr: 'release not found\n'
+    }
+  ])('does not classify GitHub not-found with $name as missing', async ({ stdout, stderr }) => {
+    const harness = commandHarness([result(1, stdout, stderr)]);
     const commandGateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
     const writes: string[] = [];
     const gateway: ReleaseGateway = {
@@ -385,6 +432,19 @@ describe('command release gateway', () => {
     {
       name: 'Git remote tag output',
       result: result(0, 'not-a-commit\n'),
+      invoke: (gateway: ReleaseGateway) => gateway.readTagCommit(metadata.tag)
+    },
+    {
+      name: 'lightweight Git remote tag output',
+      result: result(0, `${commit}\trefs/tags/v1.2.3\n`),
+      invoke: (gateway: ReleaseGateway) => gateway.readTagCommit(metadata.tag)
+    },
+    {
+      name: 'conflicting Git remote tag output',
+      result: result(
+        0,
+        `${tagObject}\trefs/tags/v1.2.3\n${commit}\trefs/tags/v1.2.3^{}\nffffffffffffffffffffffffffffffffffffffff\trefs/tags/v1.2.3^{}\n`
+      ),
       invoke: (gateway: ReleaseGateway) => gateway.readTagCommit(metadata.tag)
     },
     {
@@ -480,7 +540,9 @@ describe('command release gateway', () => {
 
       if (command === 'git' && args[0] === 'ls-remote') {
         return Promise.resolve(
-          remoteCommit === null ? result(2) : result(0, `${remoteCommit}\trefs/tags/v1.2.3\n`)
+          remoteCommit === null
+            ? result(2)
+            : result(0, `${tagObject}\trefs/tags/v1.2.3\n${remoteCommit}\trefs/tags/v1.2.3^{}\n`)
         );
       }
       if (command === 'git' && args[0] === 'rev-list') {
