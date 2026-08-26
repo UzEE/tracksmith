@@ -8,7 +8,6 @@ import { inspectCommand } from './commands/inspect.ts';
 import { muxCommand } from './commands/mux.ts';
 import { testClipCommand } from './commands/test-clip.ts';
 import { ProcessRunner } from './runner.ts';
-import { requireTools } from './tools.ts';
 import { CliError } from './types.ts';
 
 const USAGE = `tracksmith — inspect, extract, sync-test, and mux Matroska audio tracks
@@ -98,7 +97,6 @@ export async function runCli(
           parseArgs({ args: rest, options: {}, allowPositionals: true, strict: true })
         );
         const file = requireFilePositional(positionals, 'inspect');
-        requireTools(['mkvmerge'], deps.which);
         stdout(await inspectCommand(file, deps));
         return 0;
       }
@@ -116,7 +114,6 @@ export async function runCli(
           })
         );
         const file = requireFilePositional(positionals, 'extract');
-        requireTools(['mkvmerge'], deps.which);
         const output = await extractCommand(
           {
             file,
@@ -149,7 +146,6 @@ export async function runCli(
         if (!values.video || !values.audio)
           throw new CliError('test-clip requires --video and --audio.');
         if (!values.start) throw new CliError('test-clip requires --start.');
-        requireTools(['ffmpeg', 'mkvmerge'], deps.which);
         const output = await testClipCommand(
           {
             video: values.video,
@@ -187,7 +183,6 @@ export async function runCli(
         if (!values.video || !values.audio) throw new CliError('mux requires --video and --audio.');
         if (!values.output)
           throw new CliError('mux requires --output (no default output name for the final file).');
-        requireTools(['mkvmerge'], deps.which);
         const output = await muxCommand(
           {
             video: values.video,

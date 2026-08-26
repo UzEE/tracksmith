@@ -33,5 +33,4 @@ export interface CommandDeps {
   isTTY: boolean;
   confirm: (message: string) => Promise<boolean>;
   exists?: (path: string) => boolean;
-  which?: (cmd: string) => string | null;
 }
