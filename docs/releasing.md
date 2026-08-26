@@ -18,9 +18,15 @@ Sections 3–7 write to npm or to GitHub. Each of these is a separate action nee
 
 ## 2. Preflight
 
-Run in the repository:
+Start from the approved commit on a clean `main` branch synchronized with `origin/main`. Replace the placeholder with the approved full commit SHA:
 
 ```sh
+approved_commit='<approved-full-commit-sha>'
+test -z "$(git status --short)"
+test "$(git branch --show-current)" = main
+git fetch origin main
+test "$(git rev-parse HEAD)" = "$approved_commit"
+test "$(git rev-parse origin/main)" = "$approved_commit"
 vp check
 vp test run
 vp run package:smoke
@@ -48,8 +54,9 @@ npm can only register a Trusted Publisher on a package that already exists, so t
 
 `0.0.0` is a real public npm publication, installable by anyone the moment it lands. Its only purpose is to create the package so trust can be configured, and it deliberately gets no Git tag and no GitHub release. Give it the same scrutiny as any other publish.
 
-- Publish the tarball you just inspected, unchanged: `npm publish out/package-smoke/tracksmith-0.0.0.tgz --access public`.
-- Use a short-lived, least-privilege npm granular access token limited to publishing this package, with 2FA enabled on the account.
+- Create a granular npm token with **Packages and scopes: Read and write**, **Resource selection: All Packages**, and the shortest practical expiry.
+- `All Packages` is temporarily required only because the unscoped `tracksmith` package does not exist yet and npm cannot select it. Limit the broader access through the short expiry, this single publish, account 2FA, and immediate revocation.
+- Keep account 2FA enabled. Publish the tarball you just inspected, unchanged with `npm publish out/package-smoke/tracksmith-0.0.0.tgz --access public`, and complete the interactive OTP prompt. Do not bypass 2FA.
 - Do not create a Git tag and do not create a GitHub release for it. The release automation owns tags and releases, and `0.0.0` is outside that flow.
 - Revoke the token immediately once the publish succeeds.
 
