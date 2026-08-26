@@ -103,7 +103,7 @@ Merging that pull request is what triggers the release workflow. The workflow pr
 
 ## 8. Retry table
 
-The executor reads the tag, the npm version, and the GitHub release before writing anything, so a rerun resumes where the last attempt stopped instead of duplicating work.
+The executor reads the tag, the npm version, npm `latest`, and the GitHub release before writing anything, so a rerun resumes where the last attempt stopped instead of duplicating work. When the target version is missing, npm `latest` must equal the nearest earlier package version in the release commit's first-parent history. A mismatch means releases are out of order or the published state does not match Git history, so the executor writes nothing.
 
 | Observed state                                   | Executor does                                              |
 | ------------------------------------------------ | ---------------------------------------------------------- |
