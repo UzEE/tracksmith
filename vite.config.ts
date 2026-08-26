@@ -15,6 +15,7 @@ export default defineConfig({
       ],
       sortSideEffects: false
     },
+    sortPackageJson: false,
     trailingComma: 'none'
   },
   lint: {
@@ -37,5 +38,8 @@ export default defineConfig({
       'vite-plus/prefer-vite-plus-imports': 'error'
     },
     options: { typeAware: true, typeCheck: true }
+  },
+  pack: {
+    fixedExtension: false
   }
 });

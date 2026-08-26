@@ -1,13 +1,45 @@
 {
   "name": "tracksmith",
-  "version": "0.1.0",
-  "private": true,
-  "bin": {
-    "tracksmith": "./src/cli.ts"
-  },
+  "version": "0.0.0",
+  "description": "CLI for inspecting, extracting, syncing, and muxing Matroska audio tracks.",
   "type": "module",
+  "bin": {
+    "tracksmith": "./dist/tracksmith.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "bun@1.3.14",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UzEE/tracksmith.git"
+  },
+  "bugs": {
+    "url": "https://github.com/UzEE/tracksmith/issues"
+  },
+  "homepage": "https://github.com/UzEE/tracksmith#readme",
+  "keywords": [
+    "matroska",
+    "mkv",
+    "audio",
+    "ffmpeg",
+    "mkvtoolnix",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "tag": "latest"
+  },
   "scripts": {
     "cli": "bun run src/tracksmith.ts",
+    "build": "bun run scripts/build-package.ts",
     "test": "vp test run",
     "check": "vp check",
     "check:fix": "vp check --fix",
@@ -19,19 +51,12 @@
     "zod": "^4"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/node": "^22.20.1",
     "typescript": "^7.0.0",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.6",
     "vite-plus": "0.2.6"
   },
   "overrides": {
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.6"
-  },
-  "devEngines": {
-    "packageManager": {
-      "name": "bun",
-      "version": "1.3.14",
-      "onFail": "download"
-    }
   }
 }
