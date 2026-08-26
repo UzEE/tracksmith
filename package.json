@@ -41,6 +41,7 @@
     "cli": "bun run src/tracksmith.ts",
     "build": "bun run scripts/build-package.ts",
     "package:smoke": "bun run scripts/package-smoke.ts",
+    "check:changeset": "bun run scripts/check-changeset.ts",
     "changeset": "changeset",
     "version": "changeset version",
     "test": "vp test run",
