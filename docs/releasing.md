@@ -8,7 +8,7 @@ The release code in this repository is complete on its own. Adding it changed no
 
 Section 2 is safe to run at any time. Building, packing, inspecting the tarball, and looking up the npm name are local or read-only; they change no external state and need no approval.
 
-Everything after that writes to npm or to GitHub. Each of these is a separate action needing its own explicit approval, and approving one never implies approval of the others:
+Sections 3–7 write to npm or to GitHub. Each of these is a separate action needing its own explicit approval, and approving one never implies approval of the others:
 
 - The `0.0.0` bootstrap publish (section 3).
 - Making `UzEE/tracksmith` public (section 4).
@@ -46,7 +46,7 @@ A 404 means no public package currently resolves under that name. It is not proo
 
 npm can only register a Trusted Publisher on a package that already exists, so the very first publish is manual and unautomated.
 
-`0.0.0` is a real public npm publication, installable by anyone the moment it lands, and npm restricts unpublishing after 72 hours. Its only purpose is to create the package so trust can be configured, and it deliberately gets no Git tag and no GitHub release. Give it the same scrutiny as any other publish.
+`0.0.0` is a real public npm publication, installable by anyone the moment it lands. Its only purpose is to create the package so trust can be configured, and it deliberately gets no Git tag and no GitHub release. Give it the same scrutiny as any other publish.
 
 - Publish the tarball you just inspected, unchanged: `npm publish out/package-smoke/tracksmith-0.0.0.tgz --access public`.
 - Use a short-lived, least-privilege npm granular access token limited to publishing this package, with 2FA enabled on the account.
