@@ -17,8 +17,28 @@ import {
 } from '../scripts/release.ts';
 
 const commit = '0123456789abcdef0123456789abcdef01234567';
+const firstAncestor = '2222222222222222222222222222222222222222';
+const secondAncestor = '3333333333333333333333333333333333333333';
+const thirdAncestor = '4444444444444444444444444444444444444444';
 const tagObject = '1111111111111111111111111111111111111111';
 const integrity = 'sha512-ZXhwZWN0ZWQ=';
+const npmE404Stdout = `${JSON.stringify(
+  {
+    error: {
+      code: 'E404',
+      summary: 'Not Found - GET https://registry.npmjs.org/tracksmith%401.2.3 - Not found',
+      detail: "'tracksmith@1.2.3' is not in this registry."
+    }
+  },
+  null,
+  2
+)}\n`;
+const npmE404Stderr = `npm error code E404
+npm error 404 Not Found - GET https://registry.npmjs.org/tracksmith%401.2.3 - Not found
+npm error 404
+npm error 404  'tracksmith@1.2.3' is not in this registry.
+npm error A complete log of this run can be found in: /tmp/npm-debug.log
+`;
 const tarballPath = '/tmp/tracksmith-1.2.3.tgz';
 const previousVersion = '1.2.2' satisfies StableVersion;
 const metadata = {
@@ -354,7 +374,10 @@ describe('command release gateway', () => {
       result(0, `${commit}\n`),
       result(0, `"${integrity}"\n`),
       result(0, `"${metadata.version}"\n`),
-      result(0, '{"tagName":"v1.2.3","body":"Release notes.\\n"}\n')
+      result(
+        0,
+        '{"tagName":"v1.2.3","body":"Release notes.\\n","isDraft":false,"isPrerelease":false}\n'
+      )
     ]);
     const gateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
 
@@ -382,7 +405,7 @@ describe('command release gateway', () => {
       },
       {
         command: 'gh',
-        args: ['release', 'view', 'v1.2.3', '--json', 'tagName,body']
+        args: ['release', 'view', 'v1.2.3', '--json', 'tagName,body,isDraft,isPrerelease']
       }
     ]);
   });
@@ -442,6 +465,34 @@ describe('command release gateway', () => {
     ).resolves.toBe(false);
   });
 
+  test('treats npm 11.19 JSON E404 output as a missing target and proceeds', async () => {
+    const harness = commandHarness([result(1, npmE404Stdout, npmE404Stderr)]);
+    const commandGateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
+    const writes: string[] = [];
+    const gateway: ReleaseGateway = {
+      readTagCommit: () => Promise.resolve(null),
+      readNpmIntegrity: (name, version) => commandGateway.readNpmIntegrity(name, version),
+      readNpmLatest: () => Promise.resolve(previousVersion),
+      githubReleaseExists: () => Promise.resolve(false),
+      createAndPushTag: () => {
+        writes.push('tag');
+        return Promise.resolve();
+      },
+      publishTarball: () => {
+        writes.push('npm');
+        return Promise.resolve();
+      },
+      createGithubRelease: () => {
+        writes.push('github');
+        return Promise.resolve();
+      }
+    };
+
+    await executeRelease(input(), gateway);
+
+    expect(writes).toEqual(['tag', 'npm', 'github']);
+  });
+
   test.each([
     {
       name: 'Git tag lookup',
@@ -474,16 +525,34 @@ describe('command release gateway', () => {
   test.each([
     {
       name: 'extra stderr',
-      stdout: '',
-      stderr: 'npm error code E404\nnpm error HTTP 503: Service Unavailable\n'
+      result: result(1, '', 'npm error code E404\nnpm error HTTP 503: Service Unavailable\n')
     },
     {
-      name: 'non-empty stdout',
-      stdout: 'unexpected output\n',
-      stderr: 'npm error code E404\n'
+      name: 'malformed JSON stdout',
+      result: result(1, '{not-json}\n', npmE404Stderr)
+    },
+    {
+      name: 'non-E404 JSON code',
+      result: result(
+        1,
+        '{"error":{"code":"E401","summary":"Unauthorized","detail":"Login required"}}\n',
+        npmE404Stderr
+      )
+    },
+    {
+      name: 'compound JSON stdout',
+      result: result(1, npmE404Stdout.replace(/}\n$/, ',"extra":true}\n'), npmE404Stderr)
+    },
+    {
+      name: 'unrelated stdout',
+      result: result(1, 'unexpected output\n', 'npm error code E404\n')
+    },
+    {
+      name: 'other exit code',
+      result: result(2, npmE404Stdout, npmE404Stderr)
     }
-  ])('does not classify npm E404 with $name as missing', async ({ stdout, stderr }) => {
-    const harness = commandHarness([result(1, stdout, stderr)]);
+  ])('does not classify npm E404 with $name as missing', async ({ result: commandResult }) => {
+    const harness = commandHarness([commandResult]);
     const gateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
 
     await expect(gateway.readNpmLatest(metadata.name)).rejects.toThrow();
@@ -529,7 +598,7 @@ describe('command release gateway', () => {
     expect(harness.invocations).toEqual([
       {
         command: 'gh',
-        args: ['release', 'view', 'v1.2.3', '--json', 'tagName,body']
+        args: ['release', 'view', 'v1.2.3', '--json', 'tagName,body,isDraft,isPrerelease']
       }
     ]);
   });
@@ -565,7 +634,10 @@ describe('command release gateway', () => {
     },
     {
       name: 'GitHub output',
-      result: result(0, '{"tagName":"v9.9.9","body":"Release notes.\\n"}\n'),
+      result: result(
+        0,
+        '{"tagName":"v9.9.9","body":"Release notes.\\n","isDraft":false,"isPrerelease":false}\n'
+      ),
       invoke: (gateway: ReleaseGateway) =>
         gateway.githubReleaseExists(metadata.tag, metadata.changelogSection)
     }
@@ -578,7 +650,10 @@ describe('command release gateway', () => {
 
   test('rejects existing GitHub release notes that do not match the changelog', async () => {
     const harness = commandHarness([
-      result(0, '{"tagName":"v1.2.3","body":"Different notes.\\n"}\n')
+      result(
+        0,
+        '{"tagName":"v1.2.3","body":"Different notes.\\n","isDraft":false,"isPrerelease":false}\n'
+      )
     ]);
     const gateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
 
@@ -588,7 +663,9 @@ describe('command release gateway', () => {
   });
 
   test('rejects a malformed GitHub release body', async () => {
-    const harness = commandHarness([result(0, '{"tagName":"v1.2.3","body":false}\n')]);
+    const harness = commandHarness([
+      result(0, '{"tagName":"v1.2.3","body":false,"isDraft":false,"isPrerelease":false}\n')
+    ]);
     const gateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
 
     await expect(
@@ -598,7 +675,10 @@ describe('command release gateway', () => {
 
   test('writes nothing when existing GitHub release notes do not match', async () => {
     const harness = commandHarness([
-      result(0, '{"tagName":"v1.2.3","body":"Different notes.\\n"}\n')
+      result(
+        0,
+        '{"tagName":"v1.2.3","body":"Different notes.\\n","isDraft":false,"isPrerelease":false}\n'
+      )
     ]);
     const commandGateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
     const writes: string[] = [];
@@ -623,6 +703,43 @@ describe('command release gateway', () => {
     };
 
     await expect(executeRelease(input(), gateway)).rejects.toThrow('release notes');
+    expect(writes).toEqual([]);
+  });
+
+  test.each([
+    {
+      name: 'draft',
+      body: '{"tagName":"v1.2.3","body":"Release notes.\\n","isDraft":true,"isPrerelease":false}\n'
+    },
+    {
+      name: 'prerelease',
+      body: '{"tagName":"v1.2.3","body":"Release notes.\\n","isDraft":false,"isPrerelease":true}\n'
+    }
+  ])('writes nothing for an existing $name GitHub release', async ({ name, body }) => {
+    const harness = commandHarness([result(0, body)]);
+    const commandGateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
+    const writes: string[] = [];
+    const gateway: ReleaseGateway = {
+      readTagCommit: () => Promise.resolve(commit),
+      readNpmIntegrity: () => Promise.resolve(integrity),
+      readNpmLatest: () => Promise.resolve(metadata.version),
+      githubReleaseExists: (tag, expectedNotes) =>
+        commandGateway.githubReleaseExists(tag, expectedNotes),
+      createAndPushTag: () => {
+        writes.push('tag');
+        return Promise.resolve();
+      },
+      publishTarball: () => {
+        writes.push('npm');
+        return Promise.resolve();
+      },
+      createGithubRelease: () => {
+        writes.push('github');
+        return Promise.resolve();
+      }
+    };
+
+    await expect(executeRelease(input(), gateway)).rejects.toThrow(name);
     expect(writes).toEqual([]);
   });
 
@@ -748,7 +865,10 @@ describe('command release gateway', () => {
       if (command === 'gh' && args[1] === 'view') {
         return Promise.resolve(
           githubReleaseExists
-            ? result(0, '{"tagName":"v1.2.3","body":"Release notes.\\n"}\n')
+            ? result(
+                0,
+                '{"tagName":"v1.2.3","body":"Release notes.\\n","isDraft":false,"isPrerelease":false}\n'
+              )
             : result(1, '', 'release not found\n')
         );
       }
@@ -799,20 +919,89 @@ describe('release CLI validation', () => {
     expect(() => requireFullCommitSha('0123456')).toThrow('full commit SHA');
   });
 
-  test('reads the previous package version from the release commit first parent', async () => {
-    const harness = commandHarness([result(0, '{"version":"1.2.2"}\n')]);
+  test('reads a differing version from the immediate first-parent ancestor', async () => {
+    const harness = commandHarness([
+      result(0, `${firstAncestor}\n`),
+      result(0, '{"version":"1.2.2"}\n')
+    ]);
 
-    await expect(readPreviousPackageVersion(commit, harness.run)).resolves.toBe(previousVersion);
+    await expect(readPreviousPackageVersion(commit, metadata.version, harness.run)).resolves.toBe(
+      previousVersion
+    );
     expect(harness.invocations).toEqual([
-      { command: 'git', args: ['show', `${commit}^1:package.json`] }
+      { command: 'git', args: ['rev-list', '--first-parent', `${commit}^`] },
+      { command: 'git', args: ['show', `${firstAncestor}:package.json`] }
     ]);
   });
 
-  test('rejects a malformed previous package version', async () => {
-    const harness = commandHarness([result(0, '{"version":"next"}\n')]);
+  test('skips first-parent ancestors that already contain the target version', async () => {
+    const harness = commandHarness([
+      result(0, `${firstAncestor}\n${secondAncestor}\n${thirdAncestor}\n`),
+      result(0, '{"version":"1.2.3"}\n'),
+      result(0, '{"version":"1.2.3"}\n'),
+      result(0, '{"version":"1.2.2"}\n')
+    ]);
 
-    await expect(readPreviousPackageVersion(commit, harness.run)).rejects.toThrow(
+    await expect(readPreviousPackageVersion(commit, metadata.version, harness.run)).resolves.toBe(
+      previousVersion
+    );
+    expect(harness.invocations).toEqual([
+      { command: 'git', args: ['rev-list', '--first-parent', `${commit}^`] },
+      { command: 'git', args: ['show', `${firstAncestor}:package.json`] },
+      { command: 'git', args: ['show', `${secondAncestor}:package.json`] },
+      { command: 'git', args: ['show', `${thirdAncestor}:package.json`] }
+    ]);
+  });
+
+  test('rejects malformed first-parent history output', async () => {
+    const harness = commandHarness([result(0, 'not-a-commit\n')]);
+
+    await expect(readPreviousPackageVersion(commit, metadata.version, harness.run)).rejects.toThrow(
+      'first-parent'
+    );
+  });
+
+  test('rejects unexpected stderr from first-parent history', async () => {
+    const harness = commandHarness([
+      result(0, `${firstAncestor}\n`, 'unexpected history warning\n')
+    ]);
+
+    await expect(readPreviousPackageVersion(commit, metadata.version, harness.run)).rejects.toThrow(
+      'first-parent'
+    );
+  });
+
+  test('rejects unexpected stderr from an ancestor package read', async () => {
+    const harness = commandHarness([
+      result(0, `${firstAncestor}\n`),
+      result(0, '{"version":"1.2.2"}\n', 'unexpected show warning\n')
+    ]);
+
+    await expect(readPreviousPackageVersion(commit, metadata.version, harness.run)).rejects.toThrow(
+      'previous package'
+    );
+  });
+
+  test('rejects a malformed previous package version', async () => {
+    const harness = commandHarness([
+      result(0, `${firstAncestor}\n`),
+      result(0, '{"version":"next"}\n')
+    ]);
+
+    await expect(readPreviousPackageVersion(commit, metadata.version, harness.run)).rejects.toThrow(
       'previous package version'
+    );
+  });
+
+  test('rejects history without a differing previous package version', async () => {
+    const harness = commandHarness([
+      result(0, `${firstAncestor}\n${secondAncestor}\n`),
+      result(0, '{"version":"1.2.3"}\n'),
+      result(0, '{"version":"1.2.3"}\n')
+    ]);
+
+    await expect(readPreviousPackageVersion(commit, metadata.version, harness.run)).rejects.toThrow(
+      'differing previous package version'
     );
   });
 

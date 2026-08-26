@@ -51,7 +51,19 @@ const fullCommitPattern = /^[0-9a-f]{40}$/;
 const integrityPattern = /^sha512-[A-Za-z0-9+/]+={0,2}$/;
 const npmIntegritySchema = z.string();
 const npmVersionSchema = z.string();
-const githubReleaseSchema = z.object({ tagName: z.string(), body: z.string() });
+const npmE404Schema = z.strictObject({
+  error: z.strictObject({
+    code: z.literal('E404'),
+    summary: z.string(),
+    detail: z.string()
+  })
+});
+const githubReleaseSchema = z.object({
+  tagName: z.string(),
+  body: z.string(),
+  isDraft: z.boolean(),
+  isPrerelease: z.boolean()
+});
 const previousPackageSchema = z.object({ version: z.string() });
 
 function compareStableVersions(left: StableVersion, right: StableVersion): number {
@@ -160,8 +172,18 @@ function isMissingRemoteTag(result: CommandResult): boolean {
   return result.exitCode === 2 && result.stdout.trim() === '' && result.stderr.trim() === '';
 }
 
+function hasNpmE404Stdout(stdout: string): boolean {
+  if (stdout.trim() === '') return true;
+
+  try {
+    return z.safeParse(npmE404Schema, JSON.parse(stdout)).success;
+  } catch {
+    return false;
+  }
+}
+
 function isMissingNpmVersion(result: CommandResult): boolean {
-  if (result.exitCode !== 1 || result.stdout.trim() !== '') return false;
+  if (result.exitCode !== 1 || !hasNpmE404Stdout(result.stdout)) return false;
 
   let codeLines = 0;
   for (const line of result.stderr.split(/\r?\n/).filter((value) => value !== '')) {
@@ -278,6 +300,12 @@ function requireGithubRelease(
   if (result.data.tagName !== expectedTag) {
     throw new Error(`gh release view did not return the expected tag ${expectedTag}.`);
   }
+  if (result.data.isDraft) {
+    throw new Error('The existing GitHub release is a draft.');
+  }
+  if (result.data.isPrerelease) {
+    throw new Error('The existing GitHub release is a prerelease.');
+  }
   if (
     normalizeTrailingLineEndings(result.data.body) !== normalizeTrailingLineEndings(expectedNotes)
   ) {
@@ -335,7 +363,7 @@ export function createCommandReleaseGateway(
     },
 
     async githubReleaseExists(tag, expectedNotes) {
-      const args = ['release', 'view', tag, '--json', 'tagName,body'] as const;
+      const args = ['release', 'view', tag, '--json', 'tagName,body,isDraft,isPrerelease'] as const;
       const result = await run('gh', args);
       if (result.exitCode !== 0) {
         if (isMissingGithubRelease(result)) return false;
@@ -408,15 +436,21 @@ export function createCommandReleaseGateway(
   };
 }
 
-export async function readPreviousPackageVersion(
-  commit: string,
-  run: ReleaseCommandRunner
-): Promise<StableVersion> {
-  const args = ['show', `${commit}^1:package.json`] as const;
-  const result = requireSuccess('git', args, await run('git', args));
+function parseFirstParentCommits(stdout: string): string[] {
+  const commits = stdout.trim() === '' ? [] : stdout.trim().split(/\r?\n/);
+  if (
+    commits.some((commit) => !fullCommitPattern.test(commit)) ||
+    new Set(commits).size !== commits.length
+  ) {
+    throw new Error('git rev-list returned malformed first-parent history.');
+  }
+  return commits;
+}
+
+function parsePreviousPackageVersion(stdout: string): StableVersion {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.stdout);
+    parsed = JSON.parse(stdout);
   } catch {
     throw new Error('git show returned malformed previous package.json.');
   }
@@ -431,6 +465,32 @@ export async function readPreviousPackageVersion(
   } catch {
     throw new Error('git show returned an invalid previous package version.');
   }
+}
+
+export async function readPreviousPackageVersion(
+  commit: string,
+  targetVersion: StableVersion,
+  run: ReleaseCommandRunner
+): Promise<StableVersion> {
+  const historyArgs = ['rev-list', '--first-parent', `${commit}^`] as const;
+  const historyResult = requireSuccess('git', historyArgs, await run('git', historyArgs));
+  if (historyResult.stderr.trim() !== '') {
+    throw new Error('git rev-list returned unexpected first-parent stderr.');
+  }
+  const ancestors = parseFirstParentCommits(historyResult.stdout);
+
+  for (const ancestor of ancestors) {
+    const packageArgs = ['show', `${ancestor}:package.json`] as const;
+    // eslint-disable-next-line no-await-in-loop -- Stop at the nearest differing first-parent version.
+    const packageResult = requireSuccess('git', packageArgs, await run('git', packageArgs));
+    if (packageResult.stderr.trim() !== '') {
+      throw new Error('git show returned unexpected previous package stderr.');
+    }
+    const version = parsePreviousPackageVersion(packageResult.stdout);
+    if (version !== targetVersion) return version;
+  }
+
+  throw new Error('Git history has no differing previous package version.');
 }
 
 export function requireFullCommitSha(value: string | undefined): string {
@@ -491,13 +551,13 @@ async function releaseFromCli(): Promise<void> {
   const outputDirectory = join(repositoryRoot, 'out', 'package-smoke');
   const commit = requireFullCommitSha(process.env.GITHUB_SHA);
   const run = runCommandFrom(repositoryRoot);
-  const [packageJson, changelog, outputEntries, previousVersion] = await Promise.all([
+  const [packageJson, changelog, outputEntries] = await Promise.all([
     readFile(join(repositoryRoot, 'package.json'), 'utf8'),
     readFile(join(repositoryRoot, 'CHANGELOG.md'), 'utf8'),
-    readdir(outputDirectory),
-    readPreviousPackageVersion(commit, run)
+    readdir(outputDirectory)
   ]);
   const metadata = readReleaseMetadata(packageJson, changelog);
+  const previousVersion = await readPreviousPackageVersion(commit, metadata.version, run);
   const tarballPath = findReleaseTarball(outputDirectory, outputEntries);
   const tarballIntegrity = calculateIntegrity(await readFile(tarballPath));
   const fetchArgs = ['fetch', 'origin', '--tags'] as const;
