@@ -7,7 +7,7 @@
   },
   "type": "module",
   "scripts": {
-    "cli": "bun run src/cli.ts",
+    "cli": "bun run src/tracksmith.ts",
     "test": "vp test run",
     "check": "vp check",
     "check:fix": "vp check --fix",

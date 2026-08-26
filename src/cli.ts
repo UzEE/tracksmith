@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { parseArgs } from 'node:util';
 
 import type { CommandDeps } from './types.ts';
@@ -7,7 +6,6 @@ import { extractCommand } from './commands/extract.ts';
 import { inspectCommand } from './commands/inspect.ts';
 import { muxCommand } from './commands/mux.ts';
 import { testClipCommand } from './commands/test-clip.ts';
-import { ProcessRunner } from './runner.ts';
 import { CliError } from './types.ts';
 
 const USAGE = `tracksmith — inspect, extract, sync-test, and mux Matroska audio tracks
@@ -210,20 +208,4 @@ export async function runCli(
     }
     throw error;
   }
-}
-
-async function promptYesNo(message: string): Promise<boolean> {
-  process.stdout.write(`${message} [y/N] `);
-  for await (const line of console) {
-    return /^y(es)?$/i.test(line.trim());
-  }
-  return false;
-}
-
-if (import.meta.main) {
-  process.exitCode = await runCli(process.argv.slice(2), {
-    runner: new ProcessRunner(),
-    isTTY: process.stdin.isTTY,
-    confirm: promptYesNo
-  });
 }
