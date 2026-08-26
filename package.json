@@ -40,6 +40,7 @@
   "scripts": {
     "cli": "bun run src/tracksmith.ts",
     "build": "bun run scripts/build-package.ts",
+    "package:smoke": "bun run scripts/package-smoke.ts",
     "test": "vp test run",
     "check": "vp check",
     "check:fix": "vp check --fix",
