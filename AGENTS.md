@@ -1,6 +1,6 @@
 # Project instructions
 
-Tracksmith is a personal Bun CLI for inspecting and editing Matroska audio tracks.
+Tracksmith is a personal CLI for inspecting and editing Matroska audio tracks. Contributors use Bun and Vite+; the published package runs under Node.js and Bun.
 
 ## Toolchain
 
@@ -14,7 +14,7 @@ Tracksmith is a personal Bun CLI for inspecting and editing Matroska audio track
 
 - Keep the CLI focused on personal local use. Do not add public-service infrastructure or compatibility layers without a concrete need.
 - Validate external command output at the boundary. Use the existing Zod Mini schemas for structured JSON.
-- Preserve Bun as the CLI runtime.
+- Preserve Bun 1.3.14 as the contributor package manager and local development runtime. Keep the published CLI compatible with Node.js 22 or newer and Bun 1.3.14 or newer.
 - Preserve lossless audio handling. Do not add audio re-encoding.
 
 ## Verification

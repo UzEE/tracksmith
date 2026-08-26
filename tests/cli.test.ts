@@ -11,8 +11,7 @@ function makeDeps(runner: FakeRunner): CommandDeps {
     isTTY: false,
     confirm: async () => false,
     // Inputs the tests reference exist; output paths do not.
-    exists: (path) => ['movie.mkv', 't.mkv', 'a.mka'].includes(path),
-    which: (cmd) => `/usr/bin/${cmd}`
+    exists: (path) => ['movie.mkv', 't.mkv', 'a.mka'].includes(path)
   };
 }
 
@@ -68,13 +67,6 @@ test('extract runs probe then mkvmerge and reports the output', async () => {
   );
   expect(runner.calls).toHaveLength(2);
   expect(out.lines.join('\n')).toContain('movie.track2.mka');
-});
-
-test('missing tools abort before any subprocess runs', async () => {
-  const runner = new FakeRunner();
-  const deps: CommandDeps = { ...makeDeps(runner), which: () => null };
-  expect(await runCli(['inspect', 'movie.mkv'], deps, () => {})).toBe(1);
-  expect(runner.calls).toHaveLength(0);
 });
 
 test('negative delay is accepted in equals form', async () => {
