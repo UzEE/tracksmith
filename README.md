@@ -59,7 +59,7 @@ Install it globally:
 npm install --global tracksmith
 ```
 
-The first public release still needs approval and has not gone out. See [docs/releasing.md](docs/releasing.md) for what that involves.
+Release process and approval boundaries: [docs/releasing.md](docs/releasing.md).
 
 ## Commands
 
@@ -104,5 +104,3 @@ vp test run
 ```
 
 Vite+ delegates dependency installation to Bun. `vp check` runs Oxfmt, Oxlint, and TypeScript 7 together; use `vp check --fix` to apply safe formatting and lint fixes.
-
-Release process and approval boundaries: [docs/releasing.md](docs/releasing.md).

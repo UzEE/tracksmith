@@ -6,13 +6,15 @@ How the first public release gets bootstrapped and how every release after it ru
 
 The release code in this repository is complete on its own. Adding it changed nothing outside the repository.
 
-Everything in this runbook writes to npm or to GitHub, and each one needs explicit approval before it is run. None of it has happened yet:
+Section 2 is safe to run at any time. Building, packing, inspecting the tarball, and looking up the npm name are local or read-only; they change no external state and need no approval.
 
-- No `tracksmith` package exists on npm.
-- `UzEE/tracksmith` is still private.
-- No `npm` GitHub environment, branch protection rule, or ruleset is configured.
-- No npm Trusted Publisher is registered.
-- No release tag and no GitHub release exist.
+Everything after that writes to npm or to GitHub. Each of these is a separate action needing its own explicit approval, and approving one never implies approval of the others:
+
+- The `0.0.0` bootstrap publish (section 3).
+- Making `UzEE/tracksmith` public (section 4).
+- The GitHub repository settings and the `npm` environment (section 5).
+- Registering the npm Trusted Publisher (section 6).
+- Merging the release pull request, which triggers the tag, the publish, and the GitHub release (section 7).
 
 ## 2. Preflight
 
@@ -32,21 +34,23 @@ Inspect the exact tarball that will be published:
 tar -tzf out/package-smoke/tracksmith-*.tgz
 ```
 
-Recheck that the npm name is still free:
+Look up the npm name:
 
 ```sh
 npm view tracksmith
 ```
 
-A 404 means the name is available.
+A 404 means no public package currently resolves under that name. It is not proof of availability: names can be taken between the check and the publish, and npm blocks names too similar to existing ones. Availability is confirmed only when npm accepts the bootstrap publish.
 
 ## 3. Bootstrap `0.0.0`
 
 npm can only register a Trusted Publisher on a package that already exists, so the very first publish is manual and unautomated.
 
+`0.0.0` is a real public npm publication, installable by anyone the moment it lands, and npm restricts unpublishing after 72 hours. Its only purpose is to create the package so trust can be configured, and it deliberately gets no Git tag and no GitHub release. Give it the same scrutiny as any other publish.
+
 - Publish the tarball you just inspected, unchanged: `npm publish out/package-smoke/tracksmith-0.0.0.tgz --access public`.
 - Use a short-lived, least-privilege npm granular access token limited to publishing this package, with 2FA enabled on the account.
-- Do not create a Git tag and do not create a GitHub release. `0.0.0` is a placeholder that exists only so trust can be configured; it is not a release.
+- Do not create a Git tag and do not create a GitHub release for it. The release automation owns tags and releases, and `0.0.0` is outside that flow.
 - Revoke the token immediately once the publish succeeds.
 
 ## 4. Public repository prerequisite
@@ -102,10 +106,12 @@ The executor reads the tag, the npm version, and the GitHub release before writi
 | Complete: tag, npm version, and release present  | Nothing                                                     |
 | Wrong tag: tag points at a different commit      | Fails: the release tag points at a different commit         |
 | npm version without a tag                        | Fails: the npm version exists without a release tag         |
-| Wrong npm integrity                              | Fails: npm integrity does not match the verified tarball    |
-| GitHub release before npm                        | Fails: the GitHub release exists before npm publication     |
+| Matching tag plus npm version with wrong integrity | Fails: npm integrity does not match the verified tarball  |
+| Matching tag plus GitHub release but no npm version | Fails: the GitHub release exists before npm publication |
 
-The four failing rows stop before any write. They mean the world does not match what the release commit says it should be, and that has to be understood before another attempt.
+A GitHub release with no tag at all does not reach that last check; it fails the earlier no-tag guard instead.
+
+The four failing rows here stop before any write. They mean the world does not match what the release commit says it should be, and that has to be understood before another attempt.
 
 ## 9. Immutable state rule
 
