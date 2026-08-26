@@ -6,6 +6,6 @@ import { ProcessRunner } from './runner.ts';
 
 process.exitCode = await runCli(process.argv.slice(2), {
   runner: new ProcessRunner(),
-  isTTY: process.stdin.isTTY === true,
+  isTTY: process.stdin.isTTY ?? false,
   confirm: createConfirmPrompt()
 });
