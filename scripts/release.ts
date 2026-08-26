@@ -8,6 +8,7 @@ import * as z from 'zod/mini';
 
 import {
   calculateIntegrity,
+  parseStableVersion,
   readReleaseMetadata,
   type ReleaseMetadata,
   type ReleaseTag,
@@ -18,7 +19,8 @@ import { planRelease } from './release/state.ts';
 export interface ReleaseGateway {
   readTagCommit(tag: ReleaseTag): Promise<string | null>;
   readNpmIntegrity(name: 'tracksmith', version: StableVersion): Promise<string | null>;
-  githubReleaseExists(tag: ReleaseTag): Promise<boolean>;
+  readNpmLatest(name: 'tracksmith'): Promise<StableVersion | null>;
+  githubReleaseExists(tag: ReleaseTag, expectedNotes: string): Promise<boolean>;
   createAndPushTag(tag: ReleaseTag, commit: string, message: string): Promise<void>;
   publishTarball(path: string): Promise<void>;
   createGithubRelease(tag: ReleaseTag, notes: string): Promise<void>;
@@ -27,6 +29,7 @@ export interface ReleaseGateway {
 export interface ExecuteReleaseInput {
   metadata: ReleaseMetadata;
   commit: string;
+  previousVersion: StableVersion;
   tarballPath: string;
   tarballIntegrity: string;
 }
@@ -47,17 +50,57 @@ export type WithNotesFile = (notes: string, use: (path: string) => Promise<void>
 const fullCommitPattern = /^[0-9a-f]{40}$/;
 const integrityPattern = /^sha512-[A-Za-z0-9+/]+={0,2}$/;
 const npmIntegritySchema = z.string();
-const githubReleaseSchema = z.object({ tagName: z.string() });
+const npmVersionSchema = z.string();
+const githubReleaseSchema = z.object({ tagName: z.string(), body: z.string() });
+const previousPackageSchema = z.object({ version: z.string() });
+
+function compareStableVersions(left: StableVersion, right: StableVersion): number {
+  const leftParts = left.split('.');
+  const rightParts = right.split('.');
+
+  for (let index = 0; index < 3; index += 1) {
+    const leftPart = BigInt(leftParts[index]!);
+    const rightPart = BigInt(rightParts[index]!);
+    if (leftPart < rightPart) return -1;
+    if (leftPart > rightPart) return 1;
+  }
+
+  return 0;
+}
+
+function requireNpmLatestState(
+  targetVersion: StableVersion,
+  previousVersion: StableVersion,
+  npmIntegrity: string | null,
+  npmLatest: StableVersion | null
+): void {
+  if (npmIntegrity === null) {
+    if (compareStableVersions(targetVersion, previousVersion) <= 0) {
+      throw new Error('The target version must be newer than the previous package version.');
+    }
+    if (npmLatest !== previousVersion) {
+      throw new Error('npm latest does not match the previous package version.');
+    }
+    return;
+  }
+
+  if (npmLatest === null || compareStableVersions(npmLatest, targetVersion) < 0) {
+    throw new Error('npm latest is older than the published target version.');
+  }
+}
 
 export async function executeRelease(
   input: ExecuteReleaseInput,
   gateway: ReleaseGateway
 ): Promise<void> {
-  const [tagCommit, npmIntegrity, githubReleaseExists] = await Promise.all([
+  const [tagCommit, npmIntegrity, npmLatest, githubReleaseExists] = await Promise.all([
     gateway.readTagCommit(input.metadata.tag),
     gateway.readNpmIntegrity(input.metadata.name, input.metadata.version),
-    gateway.githubReleaseExists(input.metadata.tag)
+    gateway.readNpmLatest(input.metadata.name),
+    gateway.githubReleaseExists(input.metadata.tag, input.metadata.changelogSection)
   ]);
+
+  requireNpmLatestState(input.metadata.version, input.previousVersion, npmIntegrity, npmLatest);
 
   const actions = planRelease({
     expectedCommit: input.commit,
@@ -118,7 +161,23 @@ function isMissingRemoteTag(result: CommandResult): boolean {
 }
 
 function isMissingNpmVersion(result: CommandResult): boolean {
-  return /^(?:npm (?:ERR!|error) )?code E404$/im.test(result.stderr);
+  if (result.exitCode !== 1 || result.stdout.trim() !== '') return false;
+
+  let codeLines = 0;
+  for (const line of result.stderr.split(/\r?\n/).filter((value) => value !== '')) {
+    const code = /^(?:npm (?:ERR!|error) )?code ([A-Z0-9]+)$/i.exec(line)?.[1];
+    if (code !== undefined) {
+      if (code.toUpperCase() !== 'E404') return false;
+      codeLines += 1;
+      continue;
+    }
+
+    if (/^(?:npm (?:ERR!|error) )?404(?:\s|$)/i.test(line)) continue;
+    if (/^npm (?:ERR!|error) A complete log of this run can be found in:/i.test(line)) continue;
+    return false;
+  }
+
+  return codeLines === 1;
 }
 
 function isMissingGithubRelease(result: CommandResult): boolean {
@@ -180,7 +239,31 @@ function parseNpmIntegrity(stdout: string): string {
   return result.data;
 }
 
-function requireGithubTag(stdout: string, expectedTag: ReleaseTag): void {
+function parseNpmLatest(stdout: string): StableVersion {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new Error('npm view returned malformed JSON.');
+  }
+
+  const result = z.safeParse(npmVersionSchema, parsed);
+  if (!result.success) {
+    throw new Error('npm view returned a malformed dist-tags.latest value.');
+  }
+
+  return parseStableVersion(result.data);
+}
+
+function normalizeTrailingLineEndings(value: string): string {
+  return value.replace(/[\r\n]+$/, '');
+}
+
+function requireGithubRelease(
+  stdout: string,
+  expectedTag: ReleaseTag,
+  expectedNotes: string
+): void {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stdout);
@@ -189,8 +272,16 @@ function requireGithubTag(stdout: string, expectedTag: ReleaseTag): void {
   }
 
   const result = z.safeParse(githubReleaseSchema, parsed);
-  if (!result.success || result.data.tagName !== expectedTag) {
+  if (!result.success) {
+    throw new Error('gh release view returned malformed release metadata.');
+  }
+  if (result.data.tagName !== expectedTag) {
     throw new Error(`gh release view did not return the expected tag ${expectedTag}.`);
+  }
+  if (
+    normalizeTrailingLineEndings(result.data.body) !== normalizeTrailingLineEndings(expectedNotes)
+  ) {
+    throw new Error('The existing GitHub release notes do not match CHANGELOG.md.');
   }
 }
 
@@ -233,14 +324,24 @@ export function createCommandReleaseGateway(
       return parseNpmIntegrity(result.stdout);
     },
 
-    async githubReleaseExists(tag) {
-      const args = ['release', 'view', tag, '--json', 'tagName'] as const;
+    async readNpmLatest(name) {
+      const args = ['view', name, 'dist-tags.latest', '--json'] as const;
+      const result = await run('npm', args);
+      if (result.exitCode !== 0) {
+        if (isMissingNpmVersion(result)) return null;
+        throw commandFailure('npm', args, result);
+      }
+      return parseNpmLatest(result.stdout);
+    },
+
+    async githubReleaseExists(tag, expectedNotes) {
+      const args = ['release', 'view', tag, '--json', 'tagName,body'] as const;
       const result = await run('gh', args);
       if (result.exitCode !== 0) {
         if (isMissingGithubRelease(result)) return false;
         throw commandFailure('gh', args, result);
       }
-      requireGithubTag(result.stdout, tag);
+      requireGithubRelease(result.stdout, tag, expectedNotes);
       return true;
     },
 
@@ -307,6 +408,31 @@ export function createCommandReleaseGateway(
   };
 }
 
+export async function readPreviousPackageVersion(
+  commit: string,
+  run: ReleaseCommandRunner
+): Promise<StableVersion> {
+  const args = ['show', `${commit}^1:package.json`] as const;
+  const result = requireSuccess('git', args, await run('git', args));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch {
+    throw new Error('git show returned malformed previous package.json.');
+  }
+
+  const packageResult = z.safeParse(previousPackageSchema, parsed);
+  if (!packageResult.success) {
+    throw new Error('git show did not return a string previous package version.');
+  }
+
+  try {
+    return parseStableVersion(packageResult.data.version);
+  } catch {
+    throw new Error('git show returned an invalid previous package version.');
+  }
+}
+
 export function requireFullCommitSha(value: string | undefined): string {
   if (value === undefined || !fullCommitPattern.test(value)) {
     throw new Error('GITHUB_SHA must be a full commit SHA.');
@@ -364,20 +490,21 @@ async function releaseFromCli(): Promise<void> {
   const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const outputDirectory = join(repositoryRoot, 'out', 'package-smoke');
   const commit = requireFullCommitSha(process.env.GITHUB_SHA);
-  const [packageJson, changelog, outputEntries] = await Promise.all([
+  const run = runCommandFrom(repositoryRoot);
+  const [packageJson, changelog, outputEntries, previousVersion] = await Promise.all([
     readFile(join(repositoryRoot, 'package.json'), 'utf8'),
     readFile(join(repositoryRoot, 'CHANGELOG.md'), 'utf8'),
-    readdir(outputDirectory)
+    readdir(outputDirectory),
+    readPreviousPackageVersion(commit, run)
   ]);
   const metadata = readReleaseMetadata(packageJson, changelog);
   const tarballPath = findReleaseTarball(outputDirectory, outputEntries);
   const tarballIntegrity = calculateIntegrity(await readFile(tarballPath));
-  const run = runCommandFrom(repositoryRoot);
   const fetchArgs = ['fetch', 'origin', '--tags'] as const;
 
   requireSuccess('git', fetchArgs, await run('git', fetchArgs));
   await executeRelease(
-    { metadata, commit, tarballPath, tarballIntegrity },
+    { metadata, commit, previousVersion, tarballPath, tarballIntegrity },
     createCommandReleaseGateway(run, withTemporaryNotesFile)
   );
 }

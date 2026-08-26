@@ -10,6 +10,10 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: tracksmith-version
+  cancel-in-progress: true
+
 jobs:
   version:
     runs-on: ubuntu-latest

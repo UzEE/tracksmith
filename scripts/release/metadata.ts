@@ -16,7 +16,13 @@ const stableVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 const packageJsonSchema = z.object({
   name: z.literal('tracksmith'),
-  version: z.string()
+  version: z.string(),
+  private: z.optional(z.literal(false)),
+  publishConfig: z.object({
+    access: z.literal('public'),
+    registry: z.literal('https://registry.npmjs.org/'),
+    tag: z.literal('latest')
+  })
 });
 
 function isStableVersion(version: string): version is StableVersion {
@@ -83,7 +89,9 @@ export function readReleaseMetadata(packageJson: string, changelog: string): Rel
 
   const result = z.safeParse(packageJsonSchema, parsedPackageJson);
   if (!result.success) {
-    throw new Error('package.json must contain name "tracksmith" and a string version.');
+    throw new Error(
+      'package.json must contain publishable tracksmith metadata and a string version.'
+    );
   }
 
   const version = parseStableVersion(result.data.version);

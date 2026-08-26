@@ -71,9 +71,18 @@ Other release.
 
 describe('readReleaseMetadata', () => {
   const changelog = '## 1.2.3\n\nRelease notes.\n';
+  const validPackage = {
+    name: 'tracksmith',
+    version: '1.2.3',
+    publishConfig: {
+      access: 'public',
+      registry: 'https://registry.npmjs.org/',
+      tag: 'latest'
+    }
+  };
 
   test('validates and combines package and changelog metadata', () => {
-    expect(readReleaseMetadata('{"name":"tracksmith","version":"1.2.3"}', changelog)).toEqual({
+    expect(readReleaseMetadata(JSON.stringify(validPackage), changelog)).toEqual({
       name: 'tracksmith',
       version: '1.2.3',
       tag: 'v1.2.3',
@@ -82,7 +91,25 @@ describe('readReleaseMetadata', () => {
   });
 
   test('requires the package name to be exactly tracksmith', () => {
-    expect(() => readReleaseMetadata('{"name":"other","version":"1.2.3"}', changelog)).toThrow();
+    expect(() =>
+      readReleaseMetadata(JSON.stringify({ ...validPackage, name: 'other' }), changelog)
+    ).toThrow();
+  });
+
+  test('rejects a private package', () => {
+    expect(() =>
+      readReleaseMetadata(JSON.stringify({ ...validPackage, private: true }), changelog)
+    ).toThrow('publishable');
+  });
+
+  test.each([
+    { access: 'restricted', registry: 'https://registry.npmjs.org/', tag: 'latest' },
+    { access: 'public', registry: 'https://registry.example.com/', tag: 'latest' },
+    { access: 'public', registry: 'https://registry.npmjs.org/', tag: 'next' }
+  ])('rejects mismatched publish configuration %#', (publishConfig) => {
+    expect(() =>
+      readReleaseMetadata(JSON.stringify({ ...validPackage, publishConfig }), changelog)
+    ).toThrow('publishable');
   });
 });
 
