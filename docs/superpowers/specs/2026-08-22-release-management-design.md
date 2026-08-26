@@ -1,6 +1,6 @@
 # Release management design
 
-Approved 2026-08-22.
+Approved 2026-08-22. Amended 2026-08-26 to require a public source repository before provenance-backed publication.
 
 ## Purpose
 
@@ -13,7 +13,7 @@ Add a reviewable release process for Tracksmith that:
 5. Publishes through npm Trusted Publishing with provenance and no stored npm token.
 6. Creates the GitHub release after npm accepts the package.
 
-The target repository is `UzEE/tracksmith`. The public npm package and executable are both named `tracksmith`.
+The target repository is `UzEE/tracksmith`. The public npm package and executable are both named `tracksmith`. The repository must be public before the first provenance-backed publication because npm provenance rejects private source repositories. Implementation does not change repository visibility; that remains a separate outward-facing action requiring explicit approval.
 
 ## Current baseline
 
@@ -159,8 +159,7 @@ Every CI run:
 3. Installs dependencies from the frozen lockfile.
 4. Runs `vp check`.
 5. Runs `vp test run`.
-6. Builds the package.
-7. Runs the packed-package smoke test under Node and Bun.
+6. Runs the packed-package smoke test under Node and Bun; that command owns the single build and retains the exact tested tarball.
 
 For normal pull requests, CI also requires at least one new or changed `.changeset/*.md` file and validates Changesets status against `main`. An empty changeset satisfies the file requirement when no version change is intended.
 
@@ -174,7 +173,7 @@ It runs after pushes to `main` and uses `changesets/action` only to create or up
 
 The generated branch is `changeset-release/main`. The pull-request title and version commit identify the release clearly, for example `chore: release tracksmith`.
 
-The workflow uses the repository `GITHUB_TOKEN` with only the permissions needed for contents, pull requests, and workflow dispatch. Third-party actions are pinned to immutable commit SHAs with a comment naming the human-readable version.
+The workflow uses the repository `GITHUB_TOKEN` with only `contents: write`, `pull-requests: write`, and `actions: write`. The `actions: write` permission authorizes dispatching the CI workflow. Third-party actions are pinned to immutable commit SHAs with a comment naming the human-readable version.
 
 After creating or updating the release PR, `version.yml` dispatches `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/.github/workflows/ci.yml` against `changeset-release/main`. This gives the generated PR a check on its own head commit without a PAT or GitHub App token.
 
@@ -187,6 +186,7 @@ It runs only when GitHub reports a merged pull request where:
 - The base branch is `main`.
 - The head branch is `changeset-release/main`.
 - The pull request was merged, not merely closed.
+- The head repository is the same repository as `UzEE/tracksmith`, not a fork using the same branch name.
 
 The job uses a GitHub environment named `npm`. Its permissions are:
 
@@ -194,7 +194,7 @@ The job uses a GitHub environment named `npm`. Its permissions are:
 - `id-token: write` for npm Trusted Publishing.
 - No pull-request or package write permissions beyond those needs.
 
-The workflow uses concurrency group `tracksmith-release` with cancellation disabled so two release attempts cannot overlap.
+The workflow uses concurrency group `tracksmith-release` with `cancel-in-progress: false` and `queue: max` so release attempts do not overlap and an older pending release is not replaced by a newer one.
 
 ### Release sequence
 
@@ -205,7 +205,7 @@ The release workflow:
 3. Installs Bun 1.3.14.
 4. Installs Node.js 24 and npm 11.5.1 or newer for OIDC publishing.
 5. Installs dependencies from the frozen Bun lockfile.
-6. Runs `vp check`, `vp test run`, the build, and the packed-package smoke test.
+6. Runs `vp check`, `vp test run`, and the packed-package smoke test. The smoke command owns the single build and retains the exact tested tarball.
 7. Reads the package name and version from `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/package.json`.
 8. Requires package name `tracksmith`, a stable semantic version, and a matching section in `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/CHANGELOG.md`.
 9. Resolves the expected tag as `vX.Y.Z`.
@@ -227,11 +227,12 @@ For package version `X.Y.Z`:
 - If neither the tag nor npm version exists, create the tag and publish.
 - If `vX.Y.Z` exists, require it to point at the release commit.
 - If the tag is correct and npm lacks `X.Y.Z`, publish the verified tarball.
-- If npm already contains `X.Y.Z`, do not publish again.
+- If npm already contains `X.Y.Z`, require its `dist.integrity` to match the verified local tarball before treating publication as complete.
 - If the GitHub release is missing after publication, create it.
 - If the tag, npm version, and GitHub release all exist and agree, exit successfully.
 - If npm contains the version but the tag is absent, stop and report the inconsistent external state.
-- If a tag or GitHub release points at another commit, stop.
+- If the GitHub release exists before the matching npm version, stop and report the inconsistent external state.
+- If the tag points at another commit or npm integrity differs, stop.
 
 The workflow never deletes, moves, or recreates an existing release tag. A failed npm publish may leave the correct tag without an npm version. Rerunning the same workflow resumes from that state.
 
@@ -245,9 +246,10 @@ The implementation adds a runbook at `/home/uzee/.t3/worktrees/tracksmith/t3code
 2. Build and inspect the exact `tracksmith@0.0.0` tarball from an approved commit on `main`.
 3. Publish `0.0.0` once using a short-lived, least-privilege npm credential and account two-factor authentication.
 4. Do not create a Git tag or GitHub release for `0.0.0`.
-5. Configure npm Trusted Publishing for package `tracksmith`, repository `UzEE/tracksmith`, workflow file `release.yml`, GitHub environment `npm`, and `npm publish` permission.
-6. Remove or revoke the bootstrap credential.
-7. Merge the generated `0.1.0` release PR only after the trusted publisher is configured.
+5. Make `UzEE/tracksmith` public as a separately approved repository administration action before provenance-backed publication.
+6. Configure npm Trusted Publishing for package `tracksmith`, repository `UzEE/tracksmith`, workflow file `release.yml`, GitHub environment `npm`, and `npm publish` permission.
+7. Remove or revoke the bootstrap credential.
+8. Merge the generated `0.1.0` release PR only after the repository is public and the trusted publisher is configured.
 
 The repository implementation does not perform the bootstrap publish, configure npm, merge the release PR, or publish a real version. Each is a separate outward-facing action requiring explicit approval.
 
@@ -293,7 +295,7 @@ Update `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/README.md` to docume
 - Node.js, FFmpeg, and MKVToolNix requirements.
 - Contributor development through Bun and Vite+.
 
-Update `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/AGENTS.md` and `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/CLAUDE.md` so they distinguish the contributor toolchain from the published runtime. Bun remains the contributor package manager, but the shipped CLI supports Node and Bun.
+Update `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/AGENTS.md` so it distinguishes the contributor toolchain from the published runtime. Bun remains the contributor package manager, but the shipped CLI supports Node and Bun. Leave `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/CLAUDE.md` unchanged because it already imports `AGENTS.md`.
 
 The release design supersedes the Bun-only packaging and npm-publication exclusions in `/home/uzee/.t3/worktrees/tracksmith/t3code-c04863e9/docs/superpowers/specs/2026-08-16-tracksmith-cli-design.md`.
 
