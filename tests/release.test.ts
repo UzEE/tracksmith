@@ -247,6 +247,13 @@ function result(exitCode: number, stdout = '', stderr = ''): CommandResult {
   return { exitCode, stdout, stderr };
 }
 
+async function withFakeNotesFile(
+  _notes: string,
+  use: (path: string) => Promise<void>
+): Promise<void> {
+  await use('/tmp/tracksmith-release-notes.md');
+}
+
 function commandHarness(results: readonly CommandResult[]) {
   const invocations: CommandInvocation[] = [];
   const pending = [...results];
@@ -275,6 +282,7 @@ function commandHarness(results: readonly CommandResult[]) {
 describe('command release gateway', () => {
   test('uses the exact read commands and parses successful output', async () => {
     const harness = commandHarness([
+      result(0, `${commit}\trefs/tags/v1.2.3\n`),
       result(0, `${commit}\n`),
       result(0, `"${integrity}"\n`),
       result(0, '{"tagName":"v1.2.3"}\n')
@@ -287,6 +295,10 @@ describe('command release gateway', () => {
     );
     await expect(gateway.githubReleaseExists(metadata.tag)).resolves.toBe(true);
     expect(harness.invocations).toEqual([
+      {
+        command: 'git',
+        args: ['ls-remote', '--exit-code', '--refs', 'origin', 'refs/tags/v1.2.3']
+      },
       { command: 'git', args: ['rev-list', '-n', '1', 'v1.2.3'] },
       {
         command: 'npm',
@@ -301,11 +313,7 @@ describe('command release gateway', () => {
 
   test('returns absent state only for explicit not-found responses', async () => {
     const harness = commandHarness([
-      result(
-        128,
-        '',
-        "fatal: ambiguous argument 'v1.2.3': unknown revision or path not in the working tree.\n"
-      ),
+      result(2),
       result(1, '', 'npm error code E404\n'),
       result(1, '', 'release not found\n')
     ]);
@@ -339,9 +347,43 @@ describe('command release gateway', () => {
     await expect(invoke(gateway)).rejects.toThrow();
   });
 
+  test('does not classify a compound GitHub failure as release-not-found', async () => {
+    const harness = commandHarness([
+      result(1, '', 'release not found\nHTTP 503: Service Unavailable\n')
+    ]);
+    const commandGateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
+    const writes: string[] = [];
+    const gateway: ReleaseGateway = {
+      readTagCommit: () => Promise.resolve(commit),
+      readNpmIntegrity: () => Promise.resolve(null),
+      githubReleaseExists: (tag) => commandGateway.githubReleaseExists(tag),
+      createAndPushTag: () => {
+        writes.push('tag');
+        return Promise.resolve();
+      },
+      publishTarball: () => {
+        writes.push('npm');
+        return Promise.resolve();
+      },
+      createGithubRelease: () => {
+        writes.push('github');
+        return Promise.resolve();
+      }
+    };
+
+    await expect(executeRelease(input(), gateway)).rejects.toThrow('HTTP 503');
+    expect(writes).toEqual([]);
+    expect(harness.invocations).toEqual([
+      {
+        command: 'gh',
+        args: ['release', 'view', 'v1.2.3', '--json', 'tagName']
+      }
+    ]);
+  });
+
   test.each([
     {
-      name: 'Git tag output',
+      name: 'Git remote tag output',
       result: result(0, 'not-a-commit\n'),
       invoke: (gateway: ReleaseGateway) => gateway.readTagCommit(metadata.tag)
     },
@@ -363,7 +405,17 @@ describe('command release gateway', () => {
   });
 
   test('uses exact write argv and passes release notes through a temporary file', async () => {
-    const harness = commandHarness([result(0), result(0), result(0), result(0)]);
+    const harness = commandHarness([
+      result(
+        128,
+        '',
+        "fatal: ambiguous argument 'v1.2.3': unknown revision or path not in the working tree.\n"
+      ),
+      result(0),
+      result(0),
+      result(0),
+      result(0)
+    ]);
     const gateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
 
     await gateway.createAndPushTag(metadata.tag, commit, 'Release 1.2.3');
@@ -372,6 +424,7 @@ describe('command release gateway', () => {
 
     expect(harness.notes).toBe(metadata.changelogSection);
     expect(harness.invocations).toEqual([
+      { command: 'git', args: ['rev-list', '-n', '1', 'v1.2.3'] },
       {
         command: 'git',
         args: ['tag', '--annotate', 'v1.2.3', commit, '--message', 'Release 1.2.3']
@@ -401,11 +454,112 @@ describe('command release gateway', () => {
   });
 
   test('stops immediately when a tag write command fails', async () => {
-    const harness = commandHarness([result(1, '', 'tag failed\n')]);
+    const harness = commandHarness([
+      result(
+        128,
+        '',
+        "fatal: ambiguous argument 'v1.2.3': unknown revision or path not in the working tree.\n"
+      ),
+      result(1, '', 'tag failed\n')
+    ]);
     const gateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
 
     await expect(gateway.createAndPushTag(metadata.tag, commit, 'Release 1.2.3')).rejects.toThrow();
-    expect(harness.invocations).toHaveLength(1);
+    expect(harness.invocations).toHaveLength(2);
+  });
+
+  test('resumes in the same checkout after local tag creation succeeds and push fails', async () => {
+    const invocations: CommandInvocation[] = [];
+    let localCommit: string | null = null;
+    let remoteCommit: string | null = null;
+    let npmPublished = false;
+    let githubReleaseExists = false;
+    let pushAttempts = 0;
+    const run: ReleaseCommandRunner = (command, args) => {
+      invocations.push({ command, args });
+
+      if (command === 'git' && args[0] === 'ls-remote') {
+        return Promise.resolve(
+          remoteCommit === null ? result(2) : result(0, `${remoteCommit}\trefs/tags/v1.2.3\n`)
+        );
+      }
+      if (command === 'git' && args[0] === 'rev-list') {
+        return Promise.resolve(
+          localCommit === null
+            ? result(
+                128,
+                '',
+                "fatal: ambiguous argument 'v1.2.3': unknown revision or path not in the working tree.\n"
+              )
+            : result(0, `${localCommit}\n`)
+        );
+      }
+      if (command === 'git' && args[0] === 'cat-file') {
+        return Promise.resolve(result(0, 'tag\n'));
+      }
+      if (command === 'git' && args[0] === 'tag') {
+        localCommit = commit;
+        return Promise.resolve(result(0));
+      }
+      if (command === 'git' && args[0] === 'push') {
+        pushAttempts += 1;
+        if (pushAttempts === 1) return Promise.resolve(result(1, '', 'push failed\n'));
+        remoteCommit = localCommit;
+        return Promise.resolve(result(0));
+      }
+      if (command === 'npm' && args[0] === 'view') {
+        return Promise.resolve(
+          npmPublished ? result(0, `"${integrity}"\n`) : result(1, '', 'npm error code E404\n')
+        );
+      }
+      if (command === 'npm' && args[0] === 'publish') {
+        npmPublished = true;
+        return Promise.resolve(result(0));
+      }
+      if (command === 'gh' && args[1] === 'view') {
+        return Promise.resolve(
+          githubReleaseExists
+            ? result(0, '{"tagName":"v1.2.3"}\n')
+            : result(1, '', 'release not found\n')
+        );
+      }
+      if (command === 'gh' && args[1] === 'create') {
+        githubReleaseExists = true;
+        return Promise.resolve(result(0));
+      }
+
+      throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+    };
+    const gateway = createCommandReleaseGateway(run, withFakeNotesFile);
+
+    await expect(executeRelease(input(), gateway)).rejects.toThrow('push failed');
+    await executeRelease(input(), gateway);
+
+    expect(
+      invocations.filter(({ command, args }) => command === 'git' && args[0] === 'tag')
+    ).toHaveLength(1);
+    expect(
+      invocations.filter(({ command, args }) => command === 'git' && args[0] === 'push')
+    ).toHaveLength(2);
+    expect(invocations).toContainEqual({
+      command: 'git',
+      args: ['cat-file', '-t', 'refs/tags/v1.2.3']
+    });
+    expect(npmPublished).toBe(true);
+    expect(githubReleaseExists).toBe(true);
+  });
+
+  test('throws before push when an orphaned local tag points at another commit', async () => {
+    const wrongCommit = 'ffffffffffffffffffffffffffffffffffffffff';
+    const harness = commandHarness([result(0, `${wrongCommit}\n`)]);
+    const gateway = createCommandReleaseGateway(harness.run, harness.withNotesFile);
+
+    await expect(gateway.createAndPushTag(metadata.tag, commit, 'Release 1.2.3')).rejects.toThrow(
+      'different commit'
+    );
+    expect(harness.invocations).toEqual([
+      { command: 'git', args: ['rev-list', '-n', '1', 'v1.2.3'] }
+    ]);
   });
 });
 

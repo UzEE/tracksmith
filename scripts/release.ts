@@ -105,7 +105,7 @@ function requireSuccess(
   return result;
 }
 
-function isMissingTag(result: CommandResult, tag: ReleaseTag): boolean {
+function isMissingLocalTag(result: CommandResult, tag: ReleaseTag): boolean {
   return (
     result.stderr.includes(
       `fatal: ambiguous argument '${tag}': unknown revision or path not in the working tree.`
@@ -113,12 +113,38 @@ function isMissingTag(result: CommandResult, tag: ReleaseTag): boolean {
   );
 }
 
+function isMissingRemoteTag(result: CommandResult): boolean {
+  return result.exitCode === 2 && result.stdout.trim() === '' && result.stderr.trim() === '';
+}
+
 function isMissingNpmVersion(result: CommandResult): boolean {
   return /^(?:npm (?:ERR!|error) )?code E404$/im.test(result.stderr);
 }
 
 function isMissingGithubRelease(result: CommandResult): boolean {
-  return /^release not found$/im.test(result.stderr);
+  return result.stderr.trim().toLowerCase() === 'release not found';
+}
+
+function parseTagCommit(stdout: string): string {
+  const commit = stdout.trim();
+  if (!fullCommitPattern.test(commit)) {
+    throw new Error('git rev-list did not return a full commit SHA.');
+  }
+  return commit;
+}
+
+function requireRemoteTag(stdout: string, tag: ReleaseTag): void {
+  const lines = stdout.trim().split(/\r?\n/);
+  const [object, ref, extra] = lines[0]?.split('\t') ?? [];
+  if (
+    lines.length !== 1 ||
+    object === undefined ||
+    !fullCommitPattern.test(object) ||
+    ref !== `refs/tags/${tag}` ||
+    extra !== undefined
+  ) {
+    throw new Error(`git ls-remote did not return exactly refs/tags/${tag}.`);
+  }
 }
 
 function parseNpmIntegrity(stdout: string): string {
@@ -157,18 +183,23 @@ export function createCommandReleaseGateway(
 ): ReleaseGateway {
   return {
     async readTagCommit(tag) {
-      const args = ['rev-list', '-n', '1', tag] as const;
-      const result = await run('git', args);
-      if (result.exitCode !== 0) {
-        if (isMissingTag(result, tag)) return null;
-        throw commandFailure('git', args, result);
+      const remoteArgs = [
+        'ls-remote',
+        '--exit-code',
+        '--refs',
+        'origin',
+        `refs/tags/${tag}`
+      ] as const;
+      const remoteResult = await run('git', remoteArgs);
+      if (remoteResult.exitCode !== 0) {
+        if (isMissingRemoteTag(remoteResult)) return null;
+        throw commandFailure('git', remoteArgs, remoteResult);
       }
+      requireRemoteTag(remoteResult.stdout, tag);
 
-      const commit = result.stdout.trim();
-      if (!fullCommitPattern.test(commit)) {
-        throw new Error('git rev-list did not return a full commit SHA.');
-      }
-      return commit;
+      const localArgs = ['rev-list', '-n', '1', tag] as const;
+      const localResult = requireSuccess('git', localArgs, await run('git', localArgs));
+      return parseTagCommit(localResult.stdout);
     },
 
     async readNpmIntegrity(name, version) {
@@ -193,8 +224,28 @@ export function createCommandReleaseGateway(
     },
 
     async createAndPushTag(tag, commit, message) {
-      const tagArgs = ['tag', '--annotate', tag, commit, '--message', message] as const;
-      requireSuccess('git', tagArgs, await run('git', tagArgs));
+      const localArgs = ['rev-list', '-n', '1', tag] as const;
+      const localResult = await run('git', localArgs);
+
+      if (localResult.exitCode !== 0) {
+        if (!isMissingLocalTag(localResult, tag)) {
+          throw commandFailure('git', localArgs, localResult);
+        }
+
+        const tagArgs = ['tag', '--annotate', tag, commit, '--message', message] as const;
+        requireSuccess('git', tagArgs, await run('git', tagArgs));
+      } else {
+        const localCommit = parseTagCommit(localResult.stdout);
+        if (localCommit !== commit) {
+          throw new Error('The local release tag points at a different commit.');
+        }
+
+        const typeArgs = ['cat-file', '-t', `refs/tags/${tag}`] as const;
+        const typeResult = requireSuccess('git', typeArgs, await run('git', typeArgs));
+        if (typeResult.stdout.trim() !== 'tag') {
+          throw new Error('The local release tag is not annotated.');
+        }
+      }
 
       const pushArgs = ['push', 'origin', `refs/tags/${tag}`] as const;
       requireSuccess('git', pushArgs, await run('git', pushArgs));
