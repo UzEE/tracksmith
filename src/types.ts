@@ -4,8 +4,12 @@ export interface RunResult {
   stderr: string;
 }
 
+export interface RunOptions {
+  stream?: 'stdout' | 'stderr';
+}
+
 export interface Runner {
-  run(argv: readonly string[]): Promise<RunResult>;
+  run(argv: readonly string[], options?: RunOptions): Promise<RunResult>;
 }
 
 export interface Track {
@@ -30,7 +34,10 @@ export class CliError extends Error {
 
 export interface CommandDeps {
   runner: Runner;
+  /** stdin is interactive — gates confirmation prompts. */
   isTTY: boolean;
+  /** stderr is interactive — gates live tool progress output. */
+  stderrIsTTY: boolean;
   confirm: (message: string) => Promise<boolean>;
   exists?: (path: string) => boolean;
 }

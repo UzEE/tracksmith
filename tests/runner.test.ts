@@ -45,3 +45,33 @@ test('ProcessRunner passes argv entries through verbatim (spaces intact)', async
   ]);
   expect(result.stdout.trim()).toBe('path with spaces.mkv');
 });
+
+test('ProcessRunner streams stdout chunks through the sink while still capturing', async () => {
+  const chunks: string[] = [];
+  const runner = new ProcessRunner({ sink: (chunk) => chunks.push(chunk) });
+  const result = await runner.run(
+    [process.execPath, '-e', "console.log('Progress: 42%'); console.error('noise');"],
+    { stream: 'stdout' }
+  );
+  expect(chunks.join('')).toContain('Progress: 42%');
+  expect(chunks.join('')).not.toContain('noise');
+  expect(result.stdout.trim()).toBe('Progress: 42%');
+  expect(result.stderr.trim()).toBe('noise');
+});
+
+test('ProcessRunner streams stderr chunks through the sink', async () => {
+  const chunks: string[] = [];
+  const runner = new ProcessRunner({ sink: (chunk) => chunks.push(chunk) });
+  await runner.run([process.execPath, '-e', "console.log('out'); console.error('frame=10');"], {
+    stream: 'stderr'
+  });
+  expect(chunks.join('')).toContain('frame=10');
+  expect(chunks.join('')).not.toContain('out');
+});
+
+test('ProcessRunner leaves the sink untouched without a stream option', async () => {
+  const chunks: string[] = [];
+  const runner = new ProcessRunner({ sink: (chunk) => chunks.push(chunk) });
+  await runner.run([process.execPath, '-e', "console.log('out'); console.error('err');"]);
+  expect(chunks).toEqual([]);
+});

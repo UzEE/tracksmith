@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-import type { Runner, RunResult } from './types.ts';
+import type { RunOptions, Runner, RunResult } from './types.ts';
 
 import { installHint, isToolName } from './tools.ts';
 import { CliError } from './types.ts';
@@ -22,8 +22,18 @@ export function processStartError(program: string, error: unknown): CliError {
   return new CliError(`Failed to start ${program}: ${message}`);
 }
 
+const writeToCliStderr = (chunk: string): void => {
+  globalThis.process.stderr.write(chunk);
+};
+
 export class ProcessRunner implements Runner {
-  async run(argv: readonly string[]): Promise<RunResult> {
+  private readonly sink: (chunk: string) => void;
+
+  constructor(options: { sink?: (chunk: string) => void } = {}) {
+    this.sink = options.sink ?? writeToCliStderr;
+  }
+
+  async run(argv: readonly string[], options?: RunOptions): Promise<RunResult> {
     const [executable, ...args] = argv;
     if (executable === undefined) {
       throw new CliError('Could not start process: missing executable');
@@ -40,9 +50,11 @@ export class ProcessRunner implements Runner {
       process.stderr.setEncoding('utf8');
       process.stdout.on('data', (chunk: string) => {
         stdout += chunk;
+        if (options?.stream === 'stdout') this.sink(chunk);
       });
       process.stderr.on('data', (chunk: string) => {
         stderr += chunk;
+        if (options?.stream === 'stderr') this.sink(chunk);
       });
       process.once('error', (error) => {
         reject(processStartError(executable, error));

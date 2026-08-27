@@ -111,6 +111,7 @@ test('buildTestClipArgs allows positive delay at the beginning of a file', () =>
 // Inputs exist; sync-test outputs do not.
 const deps = {
   isTTY: false,
+  stderrIsTTY: false,
   confirm: async () => false,
   exists: (path: string) => !path.includes('.sync-test.')
 };
@@ -194,4 +195,29 @@ test('testClipCommand surfaces ffmpeg failures', async () => {
       { ...deps, runner }
     )
   ).rejects.toThrow(/encoder error/);
+});
+
+test('testClipCommand streams ffmpeg progress only when stderr is a TTY', async () => {
+  const opts = {
+    video: 'target.mkv',
+    audio: 'donor.mkv',
+    track: 2,
+    start: '600',
+    duration: '60',
+    delayMs: 0,
+    force: false
+  };
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON }); // probe donor
+  runner.queue({ exitCode: 0 }); // ffmpeg
+  await testClipCommand(opts, { ...deps, runner, stderrIsTTY: true });
+  expect(runner.options[0]).toBeUndefined(); // probe stays quiet
+  expect(runner.options[1]).toEqual({ stream: 'stderr' });
+
+  // An interactive stdin alone (e.g. `test-clip ... 2>log`) must not stream.
+  const quiet = new FakeRunner();
+  quiet.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  quiet.queue({ exitCode: 0 });
+  await testClipCommand(opts, { ...deps, runner: quiet, isTTY: true });
+  expect(quiet.options[1]).toBeUndefined();
 });
