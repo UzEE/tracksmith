@@ -95,6 +95,7 @@ test('buildMuxArgs omits --sync at zero delay and forces default-track-flag no w
 // Inputs exist; the named outputs do not.
 const deps = {
   isTTY: false,
+  stderrIsTTY: false,
   confirm: async () => false,
   exists: (path: string) => path !== 'final.mkv' && path !== 'o.mkv'
 };
@@ -157,7 +158,7 @@ test('muxCommand surfaces mkvmerge failures', async () => {
   ).rejects.toThrow(/container error/);
 });
 
-test('muxCommand streams mkvmerge progress only when attached to a TTY', async () => {
+test('muxCommand streams mkvmerge progress only when stderr is a TTY', async () => {
   const opts = {
     video: 'target.mkv',
     audio: 'movie.track2.mka',
@@ -169,13 +170,14 @@ test('muxCommand streams mkvmerge progress only when attached to a TTY', async (
   const runner = new FakeRunner();
   runner.queue({ stdout: SINGLE_AUDIO_MKA }); // probe audio input
   runner.queue({ exitCode: 0 }); // mux
-  await muxCommand(opts, { ...deps, runner, isTTY: true });
+  await muxCommand(opts, { ...deps, runner, stderrIsTTY: true });
   expect(runner.options[0]).toBeUndefined(); // probe stays quiet
   expect(runner.options[1]).toEqual({ stream: 'stdout' });
 
+  // An interactive stdin alone (e.g. `mux ... 2>log`) must not stream.
   const quiet = new FakeRunner();
   quiet.queue({ stdout: SINGLE_AUDIO_MKA });
   quiet.queue({ exitCode: 0 });
-  await muxCommand(opts, { ...deps, runner: quiet });
+  await muxCommand(opts, { ...deps, runner: quiet, isTTY: true });
   expect(quiet.options[1]).toBeUndefined();
 });

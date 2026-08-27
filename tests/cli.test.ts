@@ -9,6 +9,7 @@ function makeDeps(runner: FakeRunner): CommandDeps {
   return {
     runner,
     isTTY: false,
+    stderrIsTTY: false,
     confirm: async () => false,
     // Inputs the tests reference exist; output paths do not.
     exists: (path) => ['movie.mkv', 't.mkv', 'a.mka'].includes(path)

@@ -28,6 +28,7 @@ test('buildExtractArgs keeps only the chosen audio track, stream-copied to MKA',
 // Inputs (.mkv) exist; outputs (.mka) do not.
 const deps = {
   isTTY: false,
+  stderrIsTTY: false,
   confirm: async () => false,
   exists: (path: string) => !path.endsWith('.mka')
 };
@@ -62,6 +63,7 @@ test('extractCommand rejects a missing input file before probing or prompting', 
     {
       runner,
       isTTY: true,
+      stderrIsTTY: false,
       confirm: async () => {
         prompted = true;
         return true;
@@ -86,18 +88,19 @@ test('extractCommand surfaces mkvmerge failures with exit code and stderr', asyn
   await expect(attempt).rejects.toThrow(/disk full/);
 });
 
-test('extractCommand streams mkvmerge progress only when attached to a TTY', async () => {
+test('extractCommand streams mkvmerge progress only when stderr is a TTY', async () => {
   const opts = { file: 'movie.mkv', track: 2, force: false };
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON }); // probe
   runner.queue({ exitCode: 0 }); // extract
-  await extractCommand(opts, { ...deps, runner, isTTY: true });
+  await extractCommand(opts, { ...deps, runner, stderrIsTTY: true });
   expect(runner.options[0]).toBeUndefined(); // probe stays quiet
   expect(runner.options[1]).toEqual({ stream: 'stdout' });
 
+  // An interactive stdin alone (e.g. `extract ... 2>log`) must not stream.
   const quiet = new FakeRunner();
   quiet.queue({ stdout: SAMPLE_MKVMERGE_JSON });
   quiet.queue({ exitCode: 0 });
-  await extractCommand(opts, { ...deps, runner: quiet });
+  await extractCommand(opts, { ...deps, runner: quiet, isTTY: true });
   expect(quiet.options[1]).toBeUndefined();
 });

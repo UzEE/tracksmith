@@ -84,7 +84,7 @@ export async function muxCommand(
       makeDefault: opts.makeDefault,
       output: opts.output
     }),
-    deps.isTTY ? { stream: 'stdout' } : undefined
+    deps.stderrIsTTY ? { stream: 'stdout' } : undefined
   );
   if (result.exitCode >= 2) {
     throw new CliError(

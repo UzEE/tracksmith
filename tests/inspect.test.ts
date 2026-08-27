@@ -21,6 +21,7 @@ test('inspectCommand probes the file and returns the table', async () => {
   const out = await inspectCommand('movie.mkv', {
     runner,
     isTTY: false,
+    stderrIsTTY: false,
     confirm: async () => false,
     exists: () => true
   });
@@ -34,6 +35,7 @@ test('inspectCommand rejects a missing input file before probing', async () => {
     inspectCommand('gone.mkv', {
       runner,
       isTTY: false,
+      stderrIsTTY: false,
       confirm: async () => false,
       exists: () => false
     })
