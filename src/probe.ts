@@ -75,3 +75,14 @@ export function audioRelativeIndex(tracks: Track[], id: number): number {
     throw new CliError(`Track ${id} is not an audio track. ${validAudioIds(tracks)}`);
   return index;
 }
+
+export function requireTrack(tracks: Track[], id: number): Track {
+  const track = tracks.find((candidate) => candidate.id === id);
+  if (!track) {
+    const ids = tracks.map((candidate) => candidate.id);
+    throw new CliError(
+      `Track ${id} does not exist. Valid track IDs: ${ids.length > 0 ? ids.join(', ') : 'none'}`
+    );
+  }
+  return track;
+}

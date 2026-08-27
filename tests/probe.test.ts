@@ -6,7 +6,8 @@ import {
   audioRelativeIndex,
   parseMkvmergeJson,
   probeTracks,
-  requireAudioTrack
+  requireAudioTrack,
+  requireTrack
 } from '../src/probe.ts';
 import { CliError } from '../src/types.ts';
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from './helpers.ts';
@@ -80,4 +81,12 @@ test('audioRelativeIndex maps MKVToolNix ids to audio-relative order', () => {
   expect(audioRelativeIndex(tracks, 1)).toBe(0);
   expect(audioRelativeIndex(tracks, 2)).toBe(1);
   expect(() => audioRelativeIndex(tracks, 0)).toThrow(CliError);
+});
+
+test('requireTrack returns any existing track and rejects unknown IDs', () => {
+  const tracks = parseMkvmergeJson(SAMPLE_MKVMERGE_JSON);
+  expect(requireTrack(tracks, 3).type).toBe('subtitles');
+  expect(() => requireTrack(tracks, 9)).toThrow(
+    /Track 9 does not exist. Valid track IDs: 0, 1, 2, 3/
+  );
 });

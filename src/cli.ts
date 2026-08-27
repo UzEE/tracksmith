@@ -2,17 +2,21 @@ import { parseArgs } from 'node:util';
 
 import type { CommandDeps } from './types.ts';
 
+import { editCommand } from './commands/edit.ts';
 import { extractCommand } from './commands/extract.ts';
 import { inspectCommand } from './commands/inspect.ts';
 import { muxCommand } from './commands/mux.ts';
 import { testClipCommand } from './commands/test-clip.ts';
 import { CliError } from './types.ts';
 
-const USAGE = `tracksmith — inspect, extract, sync-test, and mux Matroska audio tracks
+const USAGE = `tracksmith — inspect, edit, extract, sync-test, and mux Matroska audio tracks
 
 Usage:
   tracksmith inspect <file>
   tracksmith extract <file> --track <id> [--output <file>] [--force]
+  tracksmith edit <file> --track <id> [--name <text>] [--language <lang>]
+                  [--default | --no-default] [--forced | --no-forced]
+  tracksmith edit <file> --title <text>
   tracksmith test-clip --video <target> --audio <donor> --track <id> --start <time>
                        [--duration 60] [--delay-ms 0] [--output <file>] [--force]
   tracksmith mux --video <target> --audio <mka-or-mkv> --output <file>
@@ -21,10 +25,12 @@ Usage:
 
 Notes:
   --track is always the MKVToolNix track ID shown by "tracksmith inspect".
+  edit changes metadata in place without remuxing. --name "" and --title "" clear the value.
+  --title sets the file title and cannot be combined with --track edits.
   Positive --delay-ms delays audio; negative advances it (e.g. --delay-ms -250).
   Times accept seconds (90, 90.5) or HH:MM:SS[.ms].
   Check sync near the beginning, middle, and end; a changing offset cannot be fixed by one delay.
-  Requires ffmpeg and MKVToolNix (mkvmerge) on PATH.`;
+  Requires ffmpeg and MKVToolNix (mkvmerge, mkvpropedit) on PATH.`;
 
 function parseIntStrict(value: string | undefined, flag: string): number {
   if (value === undefined) throw new CliError(`${flag} is required.`);
@@ -38,7 +44,10 @@ function parseTrack(value: string | undefined): number {
   return track;
 }
 
-function requireFilePositional(positionals: string[], command: 'inspect' | 'extract'): string {
+function requireFilePositional(
+  positionals: string[],
+  command: 'inspect' | 'extract' | 'edit'
+): string {
   if (positionals.length === 0) throw new CliError(`${command} requires a file argument.`);
   if (positionals.length > 1) throw new CliError(`${command} accepts exactly one file argument.`);
   return positionals[0]!;
@@ -196,6 +205,62 @@ export async function runCli(
           deps
         );
         stdout(`Wrote ${output}`);
+        return 0;
+      }
+      case 'edit': {
+        const { values, positionals } = parseOrCliError(() =>
+          parseArgs({
+            args: rest,
+            options: {
+              track: { type: 'string' },
+              name: { type: 'string' },
+              language: { type: 'string' },
+              default: { type: 'boolean' },
+              'no-default': { type: 'boolean' },
+              forced: { type: 'boolean' },
+              'no-forced': { type: 'boolean' },
+              title: { type: 'string' }
+            },
+            allowPositionals: true,
+            strict: true
+          })
+        );
+        const file = requireFilePositional(positionals, 'edit');
+        const hasTrackFlags =
+          values.track !== undefined ||
+          values.name !== undefined ||
+          values.language !== undefined ||
+          values.default !== undefined ||
+          values['no-default'] !== undefined ||
+          values.forced !== undefined ||
+          values['no-forced'] !== undefined;
+        if (values.title !== undefined && hasTrackFlags)
+          throw new CliError(
+            '--title cannot be combined with --track edits. Run them as separate invocations.'
+          );
+        if (values.default !== undefined && values['no-default'] !== undefined)
+          throw new CliError('Pass either --default or --no-default, not both.');
+        if (values.forced !== undefined && values['no-forced'] !== undefined)
+          throw new CliError('Pass either --forced or --no-forced, not both.');
+        if (values.title !== undefined) {
+          await editCommand({ kind: 'title', file, title: values.title }, deps);
+        } else {
+          if (values.track === undefined)
+            throw new CliError('edit requires --track (or --title for the file title).');
+          await editCommand(
+            {
+              kind: 'track',
+              file,
+              track: parseTrack(values.track),
+              name: values.name,
+              language: values.language,
+              isDefault: values.default ?? (values['no-default'] !== undefined ? false : undefined),
+              isForced: values.forced ?? (values['no-forced'] !== undefined ? false : undefined)
+            },
+            deps
+          );
+        }
+        stdout(`Edited ${file}`);
         return 0;
       }
       default:
