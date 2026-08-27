@@ -5,6 +5,13 @@ import { expect, test } from 'vite-plus/test';
 import { runCli } from '../src/cli.ts';
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from './helpers.ts';
 
+const SINGLE_AUDIO_MKA = JSON.stringify({
+  container: { type: 'Matroska' },
+  tracks: [
+    { id: 0, type: 'audio', codec: 'E-AC-3', properties: { language: 'eng', audio_channels: 8 } }
+  ]
+});
+
 function makeDeps(runner: FakeRunner): CommandDeps {
   return {
     runner,
@@ -70,13 +77,106 @@ test('extract runs probe then mkvmerge and reports the output', async () => {
   expect(out.lines.join('\n')).toContain('movie.track2.mka');
 });
 
+test('mux groups repeatable audio inputs and deduplicates probes', async () => {
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  runner.queue({ stdout: SINGLE_AUDIO_MKA });
+  runner.queue({ exitCode: 0 });
+  const code = await runCli(
+    [
+      'mux',
+      '--video',
+      't.mkv',
+      '--audio',
+      'a.mka',
+      '--name',
+      'First',
+      '--audio',
+      'a.mka',
+      '--track',
+      '0',
+      '--delay-ms',
+      '150',
+      '--name',
+      'Second',
+      '--output',
+      'o.mkv'
+    ],
+    makeDeps(runner),
+    () => {}
+  );
+  expect(code).toBe(0);
+  expect(runner.calls[0]).toEqual(['mkvmerge', '-J', 't.mkv']);
+  expect(runner.calls[1]).toEqual(['mkvmerge', '-J', 'a.mka']);
+  expect(runner.calls).toHaveLength(3);
+  expect(runner.calls[2]!.filter((arg) => arg === 'a.mka')).toHaveLength(2);
+  expect(runner.calls[2]!.join(' ')).toContain('--sync 0:150');
+});
+
+test('mux rejects a per-track flag before an audio input', async () => {
+  const runner = new FakeRunner();
+  expect(
+    await runCli(
+      ['mux', '--video', 't.mkv', '--track', '1', '--audio', 'a.mka', '--output', 'o.mkv'],
+      makeDeps(runner),
+      () => {}
+    )
+  ).toBe(1);
+  expect(runner.calls).toHaveLength(0);
+});
+
+test('mux rejects a duplicate per-track flag in one audio group', async () => {
+  const runner = new FakeRunner();
+  expect(
+    await runCli(
+      [
+        'mux',
+        '--video',
+        't.mkv',
+        '--audio',
+        'a.mka',
+        '--name',
+        'First',
+        '--name',
+        'Second',
+        '--output',
+        'o.mkv'
+      ],
+      makeDeps(runner),
+      () => {}
+    )
+  ).toBe(1);
+  expect(runner.calls).toHaveLength(0);
+});
+
+test('mux dry run prints the plan without running the final mkvmerge command', async () => {
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  runner.queue({ stdout: SINGLE_AUDIO_MKA });
+  const out = capture();
+  expect(
+    await runCli(
+      ['mux', '--video', 't.mkv', '--audio', 'a.mka', '--output', 'o.mkv', '--dry-run'],
+      makeDeps(runner),
+      out.write
+    )
+  ).toBe(0);
+  expect(out.lines.join('\n')).toContain('Planned tracks');
+  expect(runner.calls).toHaveLength(2);
+});
+
+test('mux requires at least one audio input', async () => {
+  const runner = new FakeRunner();
+  expect(
+    await runCli(['mux', '--video', 't.mkv', '--output', 'o.mkv'], makeDeps(runner), () => {})
+  ).toBe(1);
+  expect(runner.calls).toHaveLength(0);
+});
+
 test('negative delay is accepted in equals form', async () => {
   const runner = new FakeRunner();
-  runner.queue({
-    stdout: JSON.stringify({
-      tracks: [{ id: 0, type: 'audio', codec: 'E-AC-3', properties: { audio_channels: 8 } }]
-    })
-  });
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  runner.queue({ stdout: SINGLE_AUDIO_MKA });
   runner.queue({ exitCode: 0 });
   const code = await runCli(
     ['mux', '--video', 't.mkv', '--audio', 'a.mka', '--delay-ms=-250', '--output', 'o.mkv'],
@@ -84,16 +184,13 @@ test('negative delay is accepted in equals form', async () => {
     () => {}
   );
   expect(code).toBe(0);
-  expect(runner.calls[1]).toContain('0:-250');
+  expect(runner.calls[2]).toContain('0:-250');
 });
 
 test('negative delay is accepted in space form', async () => {
   const runner = new FakeRunner();
-  runner.queue({
-    stdout: JSON.stringify({
-      tracks: [{ id: 0, type: 'audio', codec: 'E-AC-3', properties: { audio_channels: 8 } }]
-    })
-  });
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  runner.queue({ stdout: SINGLE_AUDIO_MKA });
   runner.queue({ exitCode: 0 });
   const code = await runCli(
     ['mux', '--video', 't.mkv', '--audio', 'a.mka', '--delay-ms', '-250', '--output', 'o.mkv'],
@@ -101,7 +198,7 @@ test('negative delay is accepted in space form', async () => {
     () => {}
   );
   expect(code).toBe(0);
-  expect(runner.calls[1]).toContain('0:-250');
+  expect(runner.calls[2]).toContain('0:-250');
 });
 
 test('mux requires --output', async () => {
