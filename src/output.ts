@@ -40,8 +40,13 @@ function sameFile(left: string, right: string): boolean {
   }
 }
 
+/** Returns the input path the output aliases on disk (same dev/inode), if any. */
+export function findAliasedInput(output: string, inputs: readonly string[]): string | undefined {
+  return inputs.find((input) => sameFile(output, input));
+}
+
 export async function ensureWritable(path: string, ctx: OverwriteContext): Promise<void> {
-  const aliasedInput = ctx.inputs?.find((input) => sameFile(path, input));
+  const aliasedInput = findAliasedInput(path, ctx.inputs ?? []);
   if (aliasedInput !== undefined) {
     throw new CliError(
       `Output "${path}" is the same file as input "${aliasedInput}". Choose a different output path.`
