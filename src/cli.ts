@@ -25,7 +25,8 @@ Usage:
 
 Notes:
   --track is always the MKVToolNix track ID shown by "tracksmith inspect".
-  edit changes metadata in place without remuxing. --name "" and --title "" clear the value.
+  edit changes metadata in place without remuxing. --name "" and --title "" clear the value
+  (in Windows PowerShell use --name= and --title=; empty "" arguments get dropped).
   --title sets the file title and cannot be combined with --track edits.
   Positive --delay-ms delays audio; negative advances it (e.g. --delay-ms -250).
   Times accept seconds (90, 90.5) or HH:MM:SS[.ms].

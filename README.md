@@ -74,7 +74,7 @@ tracksmith mux --video <target> --audio <mka-or-mkv> --output <file> [--track <i
 
 `--track` is always the MKVToolNix track ID shown by `tracksmith inspect`. Times accept seconds such as `90` or `90.5`, or `HH:MM:SS[.ms]`.
 
-`edit` changes metadata in place without remuxing. `--name ""` and `--title ""` clear the value, and `--title` (the file title) cannot be combined with `--track` edits.
+`edit` changes metadata in place without remuxing. `--name ""` and `--title ""` clear the value, and `--title` (the file title) cannot be combined with `--track` edits. In Windows PowerShell, use the equals forms `--name=` and `--title=` to clear — PowerShell drops empty `""` arguments before they reach the CLI.
 
 ## PowerShell walkthrough
 
