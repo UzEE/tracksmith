@@ -242,12 +242,13 @@ export async function runCli(
           throw new CliError('Pass either --default or --no-default, not both.');
         if (values.forced !== undefined && values['no-forced'] !== undefined)
           throw new CliError('Pass either --forced or --no-forced, not both.');
+        let warning: string | undefined;
         if (values.title !== undefined) {
-          await editCommand({ kind: 'title', file, title: values.title }, deps);
+          warning = await editCommand({ kind: 'title', file, title: values.title }, deps);
         } else {
           if (values.track === undefined)
             throw new CliError('edit requires --track (or --title for the file title).');
-          await editCommand(
+          warning = await editCommand(
             {
               kind: 'track',
               file,
@@ -260,6 +261,7 @@ export async function runCli(
             deps
           );
         }
+        if (warning !== undefined) console.error(`tracksmith: ${warning}`);
         stdout(`Edited ${file}`);
         return 0;
       }

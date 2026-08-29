@@ -55,7 +55,8 @@ export function buildEditArgs(opts: EditOpts): string[] {
   }
 }
 
-export async function editCommand(opts: EditOpts, deps: CommandDeps): Promise<void> {
+/** Returns mkvpropedit's diagnostic output when it exited 1 (modified with warnings). */
+export async function editCommand(opts: EditOpts, deps: CommandDeps): Promise<string | undefined> {
   requireInputFile(opts.file, deps.exists);
   if (opts.kind === 'track') {
     if (!hasTrackEdit(opts)) {
@@ -71,4 +72,12 @@ export async function editCommand(opts: EditOpts, deps: CommandDeps): Promise<vo
       `mkvpropedit failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`
     );
   }
+  if (result.exitCode === 1) {
+    const output = [result.stdout, result.stderr]
+      .map((stream) => stream.trim())
+      .filter(Boolean)
+      .join('\n');
+    return `mkvpropedit finished with warnings — check the file in a player:\n${output}`;
+  }
+  return undefined;
 }

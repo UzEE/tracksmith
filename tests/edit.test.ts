@@ -83,12 +83,16 @@ test('editCommand rejects a missing input file before running anything', async (
   expect(runner.calls).toHaveLength(0);
 });
 
-test('editCommand edits the title without probing tracks', async () => {
+test('editCommand edits the title without probing tracks and returns no warning', async () => {
   const runner = new FakeRunner();
   runner.queue({ exitCode: 0 });
-  await editCommand({ kind: 'title', file: 'movie.mkv', title: 'T' }, { ...deps, runner });
+  const warning = await editCommand(
+    { kind: 'title', file: 'movie.mkv', title: 'T' },
+    { ...deps, runner }
+  );
   expect(runner.calls).toHaveLength(1);
   expect(runner.calls[0]?.[0]).toBe('mkvpropedit');
+  expect(warning).toBeUndefined();
 });
 
 test('editCommand validates the track exists before running mkvpropedit', async () => {
@@ -127,10 +131,18 @@ test('editCommand probes, then applies the track edit', async () => {
   ]);
 });
 
-test('editCommand tolerates mkvpropedit warnings (exit 1) but fails on errors (exit 2)', async () => {
+test('editCommand returns mkvpropedit warning output on exit 1 but fails on exit 2', async () => {
   const runner = new FakeRunner();
-  runner.queue({ exitCode: 1, stderr: 'Warning: something minor' });
-  await editCommand({ kind: 'title', file: 'movie.mkv', title: 'T' }, { ...deps, runner });
+  runner.queue({
+    exitCode: 1,
+    stdout: 'The file is being analyzed.',
+    stderr: 'Warning: something minor'
+  });
+  const warning = await editCommand(
+    { kind: 'title', file: 'movie.mkv', title: 'T' },
+    { ...deps, runner }
+  );
+  expect(warning).toContain('Warning: something minor');
 
   const failing = new FakeRunner();
   failing.queue({ exitCode: 2, stderr: 'Error: cannot write' });
