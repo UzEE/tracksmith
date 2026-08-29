@@ -1,11 +1,11 @@
 # tracksmith
 
-Tracksmith is a CLI for MKV files. It inspects tracks, extracts an audio track losslessly, creates short clips for checking audio/video sync, and muxes aligned audio into another MKV. It wraps FFmpeg and MKVToolNix. Audio tracks are always stream-copied, so Tracksmith never transcodes or re-encodes audio.
+Tracksmith is a CLI for MKV files. It inspects tracks, edits metadata in place, extracts an audio track losslessly, creates short clips for checking audio/video sync, and muxes aligned audio into another MKV. It wraps FFmpeg and MKVToolNix. Audio tracks are always stream-copied, so Tracksmith never transcodes or re-encodes audio.
 
 ## Requirements
 
 - [Node.js](https://nodejs.org) 22 or newer, or [Bun](https://bun.com) 1.3.14 or newer
-- `ffmpeg` and `mkvmerge` available on `PATH`
+- `ffmpeg`, `mkvmerge`, and `mkvpropedit` available on `PATH`
 
 `ffmpeg`:
 
@@ -24,7 +24,7 @@ sudo apt install ffmpeg
 sudo pacman -S ffmpeg
 ```
 
-`mkvmerge`:
+`mkvmerge` and `mkvpropedit` (both part of MKVToolNix):
 
 ```powershell
 # Windows (choose one)
@@ -66,11 +66,15 @@ Release process and approval boundaries: [docs/releasing.md](docs/releasing.md).
 ```powershell
 tracksmith inspect <file>
 tracksmith extract <file> --track <id> [--output <file>] [--force]
+tracksmith edit <file> --track <id> [--name <text>] [--language <lang>] [--default | --no-default] [--forced | --no-forced]
+tracksmith edit <file> --title <text>
 tracksmith test-clip --video <target> --audio <donor> --track <id> --start <time> [--duration 60] [--delay-ms 0] [--output <file>] [--force]
 tracksmith mux --video <target> --audio <mka-or-mkv> --output <file> [--track <id>] [--delay-ms 0] [--language eng] [--name <title>] [--default] [--force]
 ```
 
 `--track` is always the MKVToolNix track ID shown by `tracksmith inspect`. Times accept seconds such as `90` or `90.5`, or `HH:MM:SS[.ms]`.
+
+`edit` changes metadata in place without remuxing. `--name ""` and `--title ""` clear the value, and `--title` (the file title) cannot be combined with `--track` edits.
 
 ## PowerShell walkthrough
 
