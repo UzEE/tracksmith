@@ -75,3 +75,10 @@ test('ProcessRunner leaves the sink untouched without a stream option', async ()
   await runner.run([process.execPath, '-e', "console.log('out'); console.error('err');"]);
   expect(chunks).toEqual([]);
 });
+
+test('ProcessRunner rejects when the tool is terminated by a signal', async () => {
+  const runner = new ProcessRunner();
+  const attempt = runner.run([process.execPath, '-e', 'process.kill(process.pid, "SIGKILL");']);
+  await expect(attempt).rejects.toThrow(CliError);
+  await expect(attempt).rejects.toThrow(/terminated by signal SIGKILL/);
+});

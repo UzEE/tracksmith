@@ -59,7 +59,11 @@ export class ProcessRunner implements Runner {
       process.once('error', (error) => {
         reject(processStartError(executable, error));
       });
-      process.once('close', (exitCode) => {
+      process.once('close', (exitCode, signal) => {
+        if (signal !== null) {
+          reject(new CliError(`${executable} was terminated by signal ${signal}.`));
+          return;
+        }
         resolve({ exitCode: exitCode ?? 1, stdout, stderr });
       });
     });
