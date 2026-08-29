@@ -59,9 +59,17 @@ export class ProcessRunner implements Runner {
       process.once('error', (error) => {
         reject(processStartError(executable, error));
       });
+      // Windows loses the signal: a killed child reports a plain numeric exit
+      // code (usually 1) with signal null, so this detection is POSIX-only and
+      // Windows cannot distinguish a killed tool from a warning exit.
       process.once('close', (exitCode, signal) => {
         if (signal !== null) {
-          reject(new CliError(`${executable} was terminated by signal ${signal}.`));
+          const output = [stdout, stderr]
+            .map((stream) => stream.trim())
+            .filter(Boolean)
+            .join('\n');
+          const diagnostics = output === '' ? '' : `\nOutput before termination:\n${output}`;
+          reject(new CliError(`${executable} was terminated by signal ${signal}.${diagnostics}`));
           return;
         }
         resolve({ exitCode: exitCode ?? 1, stdout, stderr });
