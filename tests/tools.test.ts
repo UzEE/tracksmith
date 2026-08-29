@@ -1,6 +1,6 @@
 import { expect, test } from 'vite-plus/test';
 
-import { installHint, isToolName } from '../src/tools.ts';
+import { TOOLS, installHint, isToolName } from '../src/tools.ts';
 
 test('recognizes supported external tools', () => {
   expect(isToolName('ffmpeg')).toBe(true);
@@ -10,7 +10,7 @@ test('recognizes supported external tools', () => {
 });
 
 test('install hints cover Windows, macOS, and Linux', () => {
-  for (const tool of ['ffmpeg', 'mkvmerge', 'mkvpropedit'] as const) {
+  for (const tool of TOOLS) {
     const hint = installHint(tool);
     expect(hint).toContain('winget');
     expect(hint).toContain('scoop');
