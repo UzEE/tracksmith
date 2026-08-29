@@ -242,6 +242,8 @@ export async function runCli(
           throw new CliError('Pass either --default or --no-default, not both.');
         if (values.forced !== undefined && values['no-forced'] !== undefined)
           throw new CliError('Pass either --forced or --no-forced, not both.');
+        if (values.language === '')
+          throw new CliError('--language cannot be empty. Use --language und for undetermined.');
         let warning: string | undefined;
         if (values.title !== undefined) {
           warning = await editCommand({ kind: 'title', file, title: values.title }, deps);

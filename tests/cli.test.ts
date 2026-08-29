@@ -174,3 +174,15 @@ test('edit sets the file title without probing', async () => {
   expect(runner.calls).toHaveLength(1);
   expect(runner.calls[0]?.[0]).toBe('mkvpropedit');
 });
+
+test('edit rejects an empty --language with a clear error instead of a raw tool failure', async () => {
+  const runner = new FakeRunner();
+  expect(
+    await runCli(
+      ['edit', 'movie.mkv', '--track', '1', '--language', ''],
+      makeDeps(runner),
+      () => {}
+    )
+  ).toBe(1);
+  expect(runner.calls).toHaveLength(0);
+});
