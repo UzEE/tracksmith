@@ -7,6 +7,8 @@ import { FakeRunner, SAMPLE_MKVMERGE_JSON } from './helpers.ts';
 test('buildEditArgs sets the segment title', () => {
   expect(buildEditArgs({ kind: 'title', file: 'movie.mkv', title: 'Movie (2024)' })).toEqual([
     'mkvpropedit',
+    '--command-line-charset',
+    'UTF-8',
     'movie.mkv',
     '--edit',
     'info',
@@ -18,6 +20,8 @@ test('buildEditArgs sets the segment title', () => {
 test('buildEditArgs deletes the segment title when set to an empty string', () => {
   expect(buildEditArgs({ kind: 'title', file: 'movie.mkv', title: '' })).toEqual([
     'mkvpropedit',
+    '--command-line-charset',
+    'UTF-8',
     'movie.mkv',
     '--edit',
     'info',
@@ -39,6 +43,8 @@ test('buildEditArgs addresses tracks by 1-based mkvpropedit position from the mk
     })
   ).toEqual([
     'mkvpropedit',
+    '--command-line-charset',
+    'UTF-8',
     'movie.mkv',
     '--edit',
     'track:3',
@@ -56,6 +62,8 @@ test('buildEditArgs addresses tracks by 1-based mkvpropedit position from the mk
 test('buildEditArgs deletes the track name when set to an empty string', () => {
   expect(buildEditArgs({ kind: 'track', file: 'movie.mkv', track: 1, name: '' })).toEqual([
     'mkvpropedit',
+    '--command-line-charset',
+    'UTF-8',
     'movie.mkv',
     '--edit',
     'track:2',
@@ -123,6 +131,8 @@ test('editCommand probes, then applies the track edit', async () => {
   expect(runner.calls[0]).toEqual(['mkvmerge', '-J', 'movie.mkv']);
   expect(runner.calls[1]).toEqual([
     'mkvpropedit',
+    '--command-line-charset',
+    'UTF-8',
     'movie.mkv',
     '--edit',
     'track:2',

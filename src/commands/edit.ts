@@ -29,7 +29,10 @@ function hasTrackEdit(opts: TrackEditOpts): boolean {
 }
 
 export function buildEditArgs(opts: EditOpts): string[] {
-  const args = ['mkvpropedit', toolPath(opts.file)];
+  // Node and Bun always pass argv as UTF-8 bytes; without this flag mkvpropedit
+  // decodes them with the system locale and silently mangles non-ASCII values
+  // (e.g. drops a Japanese title under LC_ALL=C) while still exiting 0.
+  const args = ['mkvpropedit', '--command-line-charset', 'UTF-8', toolPath(opts.file)];
   switch (opts.kind) {
     case 'title': {
       args.push('--edit', 'info');

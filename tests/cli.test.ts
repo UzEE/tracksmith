@@ -155,6 +155,8 @@ test('edit applies a track rename via mkvpropedit', async () => {
   ).toBe(0);
   expect(runner.calls[1]).toEqual([
     'mkvpropedit',
+    '--command-line-charset',
+    'UTF-8',
     'movie.mkv',
     '--edit',
     'track:2',
