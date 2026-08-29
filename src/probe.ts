@@ -26,9 +26,16 @@ const mkvmergeContainerSchema = z.object({
 });
 
 const mkvmergeOutputSchema = z.object({
-  container: z.optional(mkvmergeContainerSchema),
+  // Container metadata is ancillary: an unexpected shape must not fail track
+  // parsing, so it is validated separately and dropped on mismatch.
+  container: z.optional(z.unknown()),
   tracks: z.array(mkvmergeTrackSchema)
 });
+
+function containerTitle(container: unknown): string | undefined {
+  const result = z.safeParse(mkvmergeContainerSchema, container);
+  return result.success ? result.data.properties?.title : undefined;
+}
 
 export interface MkvFile {
   title?: string;
@@ -46,12 +53,12 @@ export function parseMkvmergeFile(json: string): MkvFile {
   if (!result.success) throw new CliError('mkvmerge -J output has an unexpected structure.');
 
   return {
-    title: result.data.container?.properties?.title,
+    title: containerTitle(result.data.container),
     tracks: result.data.tracks.map((track) => ({
       id: track.id,
       type: track.type,
       codec: track.codec,
-      language: track.properties?.language_ietf ?? track.properties?.language,
+      language: track.properties?.language_ietf || track.properties?.language || undefined,
       name: track.properties?.track_name,
       channels: track.properties?.audio_channels,
       isDefault: track.properties?.default_track ?? false,

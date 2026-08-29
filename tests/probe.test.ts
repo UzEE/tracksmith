@@ -111,3 +111,22 @@ test('parseMkvmergeFile prefers IETF language and parses forced flag and contain
   expect(tracks[0]?.language).toBe('pt-BR');
   expect(tracks[0]?.isForced).toBe(true);
 });
+
+test('parseMkvmergeFile tolerates malformed container metadata without failing track parsing', () => {
+  const { title, tracks } = parseMkvmergeFile(
+    JSON.stringify({ container: null, tracks: [{ id: 0, type: 'audio', codec: 'AC-3' }] })
+  );
+  expect(title).toBeUndefined();
+  expect(tracks).toHaveLength(1);
+});
+
+test('parseMkvmergeFile falls back to the legacy language when the IETF value is empty', () => {
+  const { tracks } = parseMkvmergeFile(
+    JSON.stringify({
+      tracks: [
+        { id: 0, type: 'audio', codec: 'AC-3', properties: { language: 'eng', language_ietf: '' } }
+      ]
+    })
+  );
+  expect(tracks[0]?.language).toBe('eng');
+});
