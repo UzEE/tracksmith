@@ -6,6 +6,7 @@ import {
   audioRelativeIndex,
   parseMkvmergeJson,
   probeTracks,
+  parseMkvmergeFile,
   requireAudioTrack,
   requireTrack
 } from '../src/probe.ts';
@@ -22,7 +23,8 @@ test('parseMkvmergeJson maps mkvmerge fields onto Track', () => {
     language: 'eng',
     name: 'Surround 5.1',
     channels: 6,
-    isDefault: true
+    isDefault: true,
+    isForced: false
   });
   expect(tracks[0]?.channels).toBeUndefined();
   expect(tracks[3]?.isDefault).toBe(false);
@@ -89,4 +91,23 @@ test('requireTrack returns any existing track and rejects unknown IDs', () => {
   expect(() => requireTrack(tracks, 9)).toThrow(
     /Track 9 does not exist. Valid track IDs: 0, 1, 2, 3/
   );
+});
+
+const IETF_TITLE_JSON = JSON.stringify({
+  container: { properties: { title: 'My Movie' } },
+  tracks: [
+    {
+      id: 0,
+      type: 'audio',
+      codec: 'AC-3',
+      properties: { language: 'por', language_ietf: 'pt-BR', forced_track: true }
+    }
+  ]
+});
+
+test('parseMkvmergeFile prefers IETF language and parses forced flag and container title', () => {
+  const { title, tracks } = parseMkvmergeFile(IETF_TITLE_JSON);
+  expect(title).toBe('My Movie');
+  expect(tracks[0]?.language).toBe('pt-BR');
+  expect(tracks[0]?.isForced).toBe(true);
 });
