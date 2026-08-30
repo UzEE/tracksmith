@@ -113,3 +113,78 @@ test('mux requires --output', async () => {
     )
   ).toBe(1);
 });
+
+test('edit rejects combining --title with --track edits', async () => {
+  const runner = new FakeRunner();
+  const deps = makeDeps(runner);
+  expect(await runCli(['edit', 'movie.mkv', '--title', 'T', '--track', '1'], deps, () => {})).toBe(
+    1
+  );
+  expect(await runCli(['edit', 'movie.mkv', '--title', 'T', '--name', 'N'], deps, () => {})).toBe(
+    1
+  );
+  expect(runner.calls).toHaveLength(0);
+});
+
+test('edit rejects contradictory flag pairs and empty edits', async () => {
+  const runner = new FakeRunner();
+  const deps = makeDeps(runner);
+  expect(
+    await runCli(['edit', 'movie.mkv', '--track', '1', '--default', '--no-default'], deps, () => {})
+  ).toBe(1);
+  expect(
+    await runCli(['edit', 'movie.mkv', '--track', '1', '--forced', '--no-forced'], deps, () => {})
+  ).toBe(1);
+  expect(await runCli(['edit', 'movie.mkv', '--track', '1'], deps, () => {})).toBe(1);
+  expect(await runCli(['edit', 'movie.mkv'], deps, () => {})).toBe(1);
+  expect(await runCli(['edit', 'movie.mkv', '--name', 'N'], deps, () => {})).toBe(1);
+  expect(runner.calls).toHaveLength(0);
+});
+
+test('edit applies a track rename via mkvpropedit', async () => {
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON }); // probe
+  runner.queue({ exitCode: 0 }); // mkvpropedit
+  const out = capture();
+  expect(
+    await runCli(
+      ['edit', 'movie.mkv', '--track', '1', '--name', 'Commentary'],
+      makeDeps(runner),
+      out.write
+    )
+  ).toBe(0);
+  expect(runner.calls[1]).toEqual([
+    'mkvpropedit',
+    '--command-line-charset',
+    'UTF-8',
+    'movie.mkv',
+    '--edit',
+    'track:2',
+    '--set',
+    'name=Commentary'
+  ]);
+  expect(out.lines.join('\n')).toContain('Edited movie.mkv');
+});
+
+test('edit sets the file title without probing', async () => {
+  const runner = new FakeRunner();
+  runner.queue({ exitCode: 0 });
+  const out = capture();
+  expect(
+    await runCli(['edit', 'movie.mkv', '--title', 'Movie (2024)'], makeDeps(runner), out.write)
+  ).toBe(0);
+  expect(runner.calls).toHaveLength(1);
+  expect(runner.calls[0]?.[0]).toBe('mkvpropedit');
+});
+
+test('edit rejects an empty --language with a clear error instead of a raw tool failure', async () => {
+  const runner = new FakeRunner();
+  expect(
+    await runCli(
+      ['edit', 'movie.mkv', '--track', '1', '--language', ''],
+      makeDeps(runner),
+      () => {}
+    )
+  ).toBe(1);
+  expect(runner.calls).toHaveLength(0);
+});

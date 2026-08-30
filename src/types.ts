@@ -20,6 +20,7 @@ export interface Track {
   name?: string;
   channels?: number;
   isDefault: boolean;
+  isForced: boolean;
 }
 
 export class CliError extends Error {

@@ -46,7 +46,7 @@ export const SAMPLE_MKVMERGE_JSON = JSON.stringify({
       id: 3,
       type: 'subtitles',
       codec: 'SubRip/SRT',
-      properties: { language: 'eng', default_track: false }
+      properties: { language: 'eng', default_track: false, forced_track: true }
     }
   ]
 });

@@ -1,10 +1,10 @@
 import type { CommandDeps, Track } from '../types.ts';
 
 import { requireInputFile } from '../output.ts';
-import { probeTracks } from '../probe.ts';
+import { probeFile } from '../probe.ts';
 
 export function formatTrackTable(tracks: Track[]): string {
-  const header = ['ID', 'TYPE', 'CODEC', 'LANG', 'CH', 'DEFAULT', 'NAME'];
+  const header = ['ID', 'TYPE', 'CODEC', 'LANG', 'CH', 'DEFAULT', 'FORCED', 'NAME'];
   const rows = tracks.map((track) => [
     String(track.id),
     track.type,
@@ -12,6 +12,7 @@ export function formatTrackTable(tracks: Track[]): string {
     track.language ?? '-',
     track.channels !== undefined ? String(track.channels) : '-',
     track.isDefault ? 'yes' : '-',
+    track.isForced ? 'yes' : '-',
     track.name ?? '-'
   ]);
   const all = [header, ...rows];
@@ -28,5 +29,7 @@ export function formatTrackTable(tracks: Track[]): string {
 
 export async function inspectCommand(file: string, deps: CommandDeps): Promise<string> {
   requireInputFile(file, deps.exists);
-  return formatTrackTable(await probeTracks(deps.runner, file));
+  const { title, tracks } = await probeFile(deps.runner, file);
+  const table = formatTrackTable(tracks);
+  return title === undefined ? table : `Title: ${title}\n\n${table}`;
 }

@@ -6,7 +6,9 @@ import {
   audioRelativeIndex,
   parseMkvmergeJson,
   probeTracks,
-  requireAudioTrack
+  parseMkvmergeFile,
+  requireAudioTrack,
+  requireTrack
 } from '../src/probe.ts';
 import { CliError } from '../src/types.ts';
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from './helpers.ts';
@@ -21,7 +23,8 @@ test('parseMkvmergeJson maps mkvmerge fields onto Track', () => {
     language: 'eng',
     name: 'Surround 5.1',
     channels: 6,
-    isDefault: true
+    isDefault: true,
+    isForced: false
   });
   expect(tracks[0]?.channels).toBeUndefined();
   expect(tracks[3]?.isDefault).toBe(false);
@@ -80,4 +83,50 @@ test('audioRelativeIndex maps MKVToolNix ids to audio-relative order', () => {
   expect(audioRelativeIndex(tracks, 1)).toBe(0);
   expect(audioRelativeIndex(tracks, 2)).toBe(1);
   expect(() => audioRelativeIndex(tracks, 0)).toThrow(CliError);
+});
+
+test('requireTrack returns any existing track and rejects unknown IDs', () => {
+  const tracks = parseMkvmergeJson(SAMPLE_MKVMERGE_JSON);
+  expect(requireTrack(tracks, 3).type).toBe('subtitles');
+  expect(() => requireTrack(tracks, 9)).toThrow(
+    /Track 9 does not exist. Valid track IDs: 0, 1, 2, 3/
+  );
+});
+
+const IETF_TITLE_JSON = JSON.stringify({
+  container: { properties: { title: 'My Movie' } },
+  tracks: [
+    {
+      id: 0,
+      type: 'audio',
+      codec: 'AC-3',
+      properties: { language: 'por', language_ietf: 'pt-BR', forced_track: true }
+    }
+  ]
+});
+
+test('parseMkvmergeFile prefers IETF language and parses forced flag and container title', () => {
+  const { title, tracks } = parseMkvmergeFile(IETF_TITLE_JSON);
+  expect(title).toBe('My Movie');
+  expect(tracks[0]?.language).toBe('pt-BR');
+  expect(tracks[0]?.isForced).toBe(true);
+});
+
+test('parseMkvmergeFile tolerates malformed container metadata without failing track parsing', () => {
+  const { title, tracks } = parseMkvmergeFile(
+    JSON.stringify({ container: null, tracks: [{ id: 0, type: 'audio', codec: 'AC-3' }] })
+  );
+  expect(title).toBeUndefined();
+  expect(tracks).toHaveLength(1);
+});
+
+test('parseMkvmergeFile falls back to the legacy language when the IETF value is empty', () => {
+  const { tracks } = parseMkvmergeFile(
+    JSON.stringify({
+      tracks: [
+        { id: 0, type: 'audio', codec: 'AC-3', properties: { language: 'eng', language_ietf: '' } }
+      ]
+    })
+  );
+  expect(tracks[0]?.language).toBe('eng');
 });
