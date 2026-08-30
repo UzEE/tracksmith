@@ -50,6 +50,7 @@ test('resolveAudioTrackId validates an explicit id', () => {
 test('buildMuxArgs emits one input block per group after the target', () => {
   const args = buildMuxArgs({
     video: 'target (2023).mkv',
+    videoTrackIds: [0, 1, 2, 3],
     clearDefaultAudioIds: [],
     output: 'final.mkv',
     groups: [
@@ -73,6 +74,8 @@ test('buildMuxArgs emits one input block per group after the target', () => {
     'mkvmerge',
     '-o',
     'final.mkv',
+    '--track-order',
+    '0:0,0:1,0:2,0:3,1:2,2:0',
     'target (2023).mkv',
     '--audio-tracks',
     '2',
@@ -108,14 +111,17 @@ test('buildMuxArgs emits one input block per group after the target', () => {
 test('buildMuxArgs clears existing default audio flags on the video input', () => {
   const args = buildMuxArgs({
     video: 'target.mkv',
+    videoTrackIds: [0, 1, 2, 3],
     clearDefaultAudioIds: [1, 2],
     output: 'final.mkv',
     groups: [{ audio: 'a.mka', trackId: 0, delayMs: 0, makeDefault: true }]
   });
-  expect(args.slice(0, 8)).toEqual([
+  expect(args.slice(0, 10)).toEqual([
     'mkvmerge',
     '-o',
     'final.mkv',
+    '--track-order',
+    '0:0,0:1,0:2,0:3,1:0',
     '--default-track-flag',
     '1:no',
     '--default-track-flag',
@@ -128,6 +134,7 @@ test('buildMuxArgs clears existing default audio flags on the video input', () =
 test('buildMuxArgs protects MKVToolNix operator-looking audio filenames', () => {
   const args = buildMuxArgs({
     video: 'target.mkv',
+    videoTrackIds: [0, 1, 2, 3],
     clearDefaultAudioIds: [],
     output: 'final.mkv',
     groups: [{ audio: '+donor.mka', trackId: 0, delayMs: 0, makeDefault: false }]
@@ -185,6 +192,13 @@ test('muxCommand probes the video then each unique audio input once', async () =
   expect(runner.calls[1]).toEqual(['mkvmerge', '-J', 'dual.mka']);
   expect(runner.calls).toHaveLength(3);
   const mux = runner.calls[2]!;
+  expect(mux.slice(0, 5)).toEqual([
+    'mkvmerge',
+    '-o',
+    'final.mkv',
+    '--track-order',
+    '0:0,0:1,0:2,0:3,1:0,2:1'
+  ]);
   expect(mux.filter((arg) => arg === 'dual.mka')).toHaveLength(2);
   expect(mux.join(' ')).toContain('--sync 1:150');
 });
@@ -258,7 +272,8 @@ test('muxCommand dry run prints the full planned layout and never runs mkvmerge'
   expect(runner.calls).toHaveLength(2); // probes only
   expect(result.plan).toContain('final.mkv');
   expect(result.plan).toContain('Surround 5.1'); // existing video audio track
-  expect(result.plan).toContain('Commentary'); // new track
+  expect(result.plan).toMatch(/^3\s+subtitles\s+SubRip\/SRT/m); // target subtitle keeps its id
+  expect(result.plan).toMatch(/^4\s+audio\s+AC-3.*Commentary/m); // new audio is appended
   expect(result.plan).toContain('target.mkv'); // source column
   expect(result.plan).toContain('dual.mka');
 });

@@ -50,11 +50,16 @@ export function resolveAudioTrackId(tracks: Track[], requested: number | undefin
 
 export function buildMuxArgs(a: {
   video: string;
+  videoTrackIds: readonly number[];
   clearDefaultAudioIds: readonly number[];
   groups: readonly ResolvedMuxTrack[];
   output: string;
 }): string[] {
-  const args = ['mkvmerge', '-o', toolPath(a.output)];
+  const trackOrder = [
+    ...a.videoTrackIds.map((trackId) => `0:${trackId}`),
+    ...a.groups.map((group, index) => `${index + 1}:${group.trackId}`)
+  ].join(',');
+  const args = ['mkvmerge', '-o', toolPath(a.output), '--track-order', trackOrder];
   for (const id of a.clearDefaultAudioIds) args.push('--default-track-flag', `${id}:no`);
   args.push(toolPath(a.video));
   for (const group of a.groups) {
@@ -187,6 +192,7 @@ export async function muxCommand(opts: MuxOptions, deps: CommandDeps): Promise<M
   const result = await deps.runner.run(
     buildMuxArgs({
       video: opts.video,
+      videoTrackIds: videoTracks.map((track) => track.id),
       clearDefaultAudioIds,
       groups,
       output: opts.output
