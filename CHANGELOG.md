@@ -1,5 +1,21 @@
 # tracksmith
 
+## 0.3.0
+
+### Minor Changes
+
+- [#8](https://github.com/UzEE/tracksmith/pull/8) [`6bc6756`](https://github.com/UzEE/tracksmith/commit/6bc67563599986c7cb7a0e7c04f036f9b455aefe) Thanks [@UzEE](https://github.com/UzEE)! - Added an `edit` command for in-place Matroska metadata edits via mkvpropedit — track name, language, default/forced flags, and the file title — without remuxing. Empty values (`--name ""`, `--title ""`) clear the property, and `--title` is mutually exclusive with `--track` edits. `inspect` now shows the forced flag, IETF (BCP 47) languages, and the file title, and a tool killed mid-edit now fails loudly instead of reporting success (POSIX platforms). Non-ASCII names and titles are stored correctly regardless of the system locale.
+
+- [#10](https://github.com/UzEE/tracksmith/pull/10) [`4feae59`](https://github.com/UzEE/tracksmith/commit/4feae597d3ad43a0aa1368bf7e70984501f9dbd6) Thanks [@UzEE](https://github.com/UzEE)! - - `mux` now accepts repeatable `--audio` groups to add several tracks in one remux; per-track flags (`--track`, `--delay-ms`, `--language`, `--name`, `--default`) apply to the most recent `--audio`, and the same source file may be repeated
+  - `--default` clears the default flag on the target's existing audio tracks so the new track really becomes the default
+  - New `--dry-run` prints the planned output track table without writing; interactive runs show the same plan and ask a single combined write/overwrite confirmation
+  - Confirmation prompts now print to stderr, keeping stdout pipeable
+  - `mux` errors about a bad `--track` or a duplicate per-track flag now name the offending group by position and path, e.g. `--audio [#2](https://github.com/UzEE/tracksmith/issues/2) ("donor.mka")`
+
+### Patch Changes
+
+- [#11](https://github.com/UzEE/tracksmith/pull/11) [`a135573`](https://github.com/UzEE/tracksmith/commit/a1355730206c3c176e4f8df27868b95d91714fcc) Thanks [@UzEE](https://github.com/UzEE)! - `mux` now passes `--command-line-charset UTF-8` to mkvmerge so non-ASCII `--name` values are stored correctly regardless of the system locale, matching `edit`.
+
 ## 0.2.0
 
 ### Minor Changes
