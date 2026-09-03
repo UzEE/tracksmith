@@ -38,6 +38,11 @@ export interface ResolvedMuxTrack {
 
 export type MuxResult = { kind: 'dry-run'; plan: string } | { kind: 'written'; output: string };
 
+/** Labels one `--audio` group by position and path, e.g. `--audio #2 ("donor.mka")`. */
+export function describeAudioGroup(index: number, audio: string): string {
+  return `--audio #${index + 1} ("${audio}")`;
+}
+
 export function resolveAudioTrackId(tracks: Track[], requested: number | undefined): number {
   if (requested !== undefined) return requireAudioTrack(tracks, requested).id;
   const audio = tracks.filter((track) => track.type === 'audio');
@@ -139,14 +144,23 @@ export async function muxCommand(opts: MuxOptions, deps: CommandDeps): Promise<M
     )
   );
 
-  const groups: ResolvedMuxTrack[] = opts.tracks.map((track) => ({
-    audio: track.audio,
-    trackId: resolveAudioTrackId(sourceTracks.get(track.audio)!, track.track),
-    delayMs: track.delayMs,
-    language: track.language,
-    trackName: track.name,
-    makeDefault: track.makeDefault
-  }));
+  const groups: ResolvedMuxTrack[] = opts.tracks.map((track, index) => {
+    let trackId: number;
+    try {
+      trackId = resolveAudioTrackId(sourceTracks.get(track.audio)!, track.track);
+    } catch (error) {
+      if (!(error instanceof CliError)) throw error;
+      throw new CliError(`${describeAudioGroup(index, track.audio)}: ${error.message}`);
+    }
+    return {
+      audio: track.audio,
+      trackId,
+      delayMs: track.delayMs,
+      language: track.language,
+      trackName: track.name,
+      makeDefault: track.makeDefault
+    };
+  });
   if (groups.filter((group) => group.makeDefault).length > 1) {
     throw new CliError('--default can be set on at most one --audio input.');
   }

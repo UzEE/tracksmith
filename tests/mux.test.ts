@@ -237,6 +237,19 @@ test('muxCommand rejects --default on more than one track', async () => {
   expect(runner.calls).toHaveLength(2); // probes only, no mux
 });
 
+test('muxCommand names the offending --audio group when track resolution fails', async () => {
+  const runner = new FakeRunner();
+  runner.queue({ stdout: SAMPLE_MKVMERGE_JSON });
+  runner.queue({ stdout: SINGLE_AUDIO_MKA });
+  runner.queue({ stdout: DUAL_AUDIO_MKA });
+  await expect(
+    muxCommand(baseOpts({ tracks: [singleTrack(), singleTrack({ audio: 'dual.mka' })] }), {
+      ...deps,
+      runner
+    })
+  ).rejects.toThrow(/--audio #2 \("dual\.mka"\): The audio input contains 2 audio tracks/);
+});
+
 test('muxCommand clears the video default audio flags only when a new track takes default', async () => {
   const runner = new FakeRunner();
   runner.queue({ stdout: SAMPLE_MKVMERGE_JSON }); // video: audio id 1 is default

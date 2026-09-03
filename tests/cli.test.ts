@@ -1,6 +1,6 @@
 import type { CommandDeps } from '../src/types.ts';
 
-import { expect, test } from 'vite-plus/test';
+import { expect, test, vi } from 'vite-plus/test';
 
 import { runCli } from '../src/cli.ts';
 import { FakeRunner, SAMPLE_MKVMERGE_JSON } from './helpers.ts';
@@ -125,27 +125,34 @@ test('mux rejects a per-track flag before an audio input', async () => {
   expect(runner.calls).toHaveLength(0);
 });
 
-test('mux rejects a duplicate per-track flag in one audio group', async () => {
+test('mux rejects a duplicate per-track flag and names the audio group', async () => {
   const runner = new FakeRunner();
-  expect(
-    await runCli(
-      [
-        'mux',
-        '--video',
-        't.mkv',
-        '--audio',
-        'a.mka',
-        '--name',
-        'First',
-        '--name',
-        'Second',
-        '--output',
-        'o.mkv'
-      ],
-      makeDeps(runner),
-      () => {}
-    )
-  ).toBe(1);
+  const errors: unknown[] = [];
+  const spy = vi.spyOn(console, 'error').mockImplementation((...args) => errors.push(...args));
+  try {
+    expect(
+      await runCli(
+        [
+          'mux',
+          '--video',
+          't.mkv',
+          '--audio',
+          'a.mka',
+          '--name',
+          'First',
+          '--name',
+          'Second',
+          '--output',
+          'o.mkv'
+        ],
+        makeDeps(runner),
+        () => {}
+      )
+    ).toBe(1);
+  } finally {
+    spy.mockRestore();
+  }
+  expect(errors.join('\n')).toContain('Duplicate --name for --audio #1 ("a.mka").');
   expect(runner.calls).toHaveLength(0);
 });
 

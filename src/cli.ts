@@ -5,7 +5,7 @@ import type { CommandDeps } from './types.ts';
 import { editCommand } from './commands/edit.ts';
 import { extractCommand } from './commands/extract.ts';
 import { inspectCommand } from './commands/inspect.ts';
-import { muxCommand } from './commands/mux.ts';
+import { describeAudioGroup, muxCommand } from './commands/mux.ts';
 import { testClipCommand } from './commands/test-clip.ts';
 import { CliError } from './types.ts';
 
@@ -221,27 +221,37 @@ export async function runCli(
           switch (token.name) {
             case 'track':
               if (group.track !== undefined)
-                throw new CliError(`Duplicate --track for audio input "${group.audio}".`);
+                throw new CliError(
+                  `Duplicate --track for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
               group.track = token.value;
               break;
             case 'delay-ms':
               if (group.delayMs !== undefined)
-                throw new CliError(`Duplicate --delay-ms for audio input "${group.audio}".`);
+                throw new CliError(
+                  `Duplicate --delay-ms for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
               group.delayMs = token.value;
               break;
             case 'language':
               if (group.language !== undefined)
-                throw new CliError(`Duplicate --language for audio input "${group.audio}".`);
+                throw new CliError(
+                  `Duplicate --language for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
               group.language = token.value;
               break;
             case 'name':
               if (group.name !== undefined)
-                throw new CliError(`Duplicate --name for audio input "${group.audio}".`);
+                throw new CliError(
+                  `Duplicate --name for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
               group.name = token.value;
               break;
             case 'default':
               if (group.makeDefault !== undefined)
-                throw new CliError(`Duplicate --default for audio input "${group.audio}".`);
+                throw new CliError(
+                  `Duplicate --default for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
               group.makeDefault = true;
               break;
           }
