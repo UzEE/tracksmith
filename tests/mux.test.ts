@@ -48,28 +48,31 @@ test('resolveAudioTrackId validates an explicit id', () => {
 });
 
 test('buildMuxArgs emits one input block per group after the target', () => {
-  const args = buildMuxArgs({
-    video: 'target (2023).mkv',
-    videoTrackIds: [0, 1, 2, 3],
-    clearDefaultAudioIds: [],
-    output: 'final.mkv',
-    groups: [
-      {
-        audio: 'donor.mkv',
-        trackId: 2,
-        delayMs: -250,
-        language: 'eng',
-        trackName: 'Fixed Audio',
-        makeDefault: false
-      },
-      {
-        audio: 'commentary.mka',
-        trackId: 0,
-        delayMs: 0,
-        makeDefault: false
-      }
-    ]
-  });
+  const args = buildMuxArgs(
+    {
+      video: 'target (2023).mkv',
+      videoTrackIds: [0, 1, 2, 3],
+      clearDefaultAudioIds: [],
+      output: 'final.mkv',
+      groups: [
+        {
+          audio: 'donor.mkv',
+          trackId: 2,
+          delayMs: -250,
+          language: 'eng',
+          trackName: 'Fixed Audio',
+          makeDefault: false
+        },
+        {
+          audio: 'commentary.mka',
+          trackId: 0,
+          delayMs: 0,
+          makeDefault: false
+        }
+      ]
+    },
+    'linux'
+  );
   expect(args).toEqual([
     'mkvmerge',
     '--command-line-charset',
@@ -111,13 +114,16 @@ test('buildMuxArgs emits one input block per group after the target', () => {
 });
 
 test('buildMuxArgs clears existing default audio flags on the video input', () => {
-  const args = buildMuxArgs({
-    video: 'target.mkv',
-    videoTrackIds: [0, 1, 2, 3],
-    clearDefaultAudioIds: [1, 2],
-    output: 'final.mkv',
-    groups: [{ audio: 'a.mka', trackId: 0, delayMs: 0, makeDefault: true }]
-  });
+  const args = buildMuxArgs(
+    {
+      video: 'target.mkv',
+      videoTrackIds: [0, 1, 2, 3],
+      clearDefaultAudioIds: [1, 2],
+      output: 'final.mkv',
+      groups: [{ audio: 'a.mka', trackId: 0, delayMs: 0, makeDefault: true }]
+    },
+    'linux'
+  );
   expect(args.slice(0, 12)).toEqual([
     'mkvmerge',
     '--command-line-charset',
@@ -135,14 +141,33 @@ test('buildMuxArgs clears existing default audio flags on the video input', () =
   expect(args.join(' ')).toContain('--default-track-flag 0:yes');
 });
 
-test('buildMuxArgs protects MKVToolNix operator-looking audio filenames', () => {
-  const args = buildMuxArgs({
+test('buildMuxArgs omits --command-line-charset on Windows where mkvmerge rejects it', () => {
+  const base = {
     video: 'target.mkv',
-    videoTrackIds: [0, 1, 2, 3],
+    videoTrackIds: [0],
     clearDefaultAudioIds: [],
-    output: 'final.mkv',
-    groups: [{ audio: '+donor.mka', trackId: 0, delayMs: 0, makeDefault: false }]
-  });
+    groups: [{ audio: 'a.mka', trackId: 0, delayMs: 0, makeDefault: false }],
+    output: 'final.mkv'
+  };
+  expect(buildMuxArgs(base, 'win32').slice(0, 3)).toEqual(['mkvmerge', '-o', 'final.mkv']);
+  expect(buildMuxArgs(base, 'linux').slice(0, 3)).toEqual([
+    'mkvmerge',
+    '--command-line-charset',
+    'UTF-8'
+  ]);
+});
+
+test('buildMuxArgs protects MKVToolNix operator-looking audio filenames', () => {
+  const args = buildMuxArgs(
+    {
+      video: 'target.mkv',
+      videoTrackIds: [0, 1, 2, 3],
+      clearDefaultAudioIds: [],
+      output: 'final.mkv',
+      groups: [{ audio: '+donor.mka', trackId: 0, delayMs: 0, makeDefault: false }]
+    },
+    'linux'
+  );
   expect(args.at(-1)).toBe(resolve('+donor.mka'));
 });
 
@@ -196,10 +221,10 @@ test('muxCommand probes the video then each unique audio input once', async () =
   expect(runner.calls[1]).toEqual(['mkvmerge', '-J', 'dual.mka']);
   expect(runner.calls).toHaveLength(3);
   const mux = runner.calls[2]!;
-  expect(mux.slice(0, 7)).toEqual([
+  const charset = process.platform === 'win32' ? [] : ['--command-line-charset', 'UTF-8'];
+  expect(mux.slice(0, 5 + charset.length)).toEqual([
     'mkvmerge',
-    '--command-line-charset',
-    'UTF-8',
+    ...charset,
     '-o',
     'final.mkv',
     '--track-order',
