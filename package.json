@@ -1,6 +1,6 @@
 {
   "name": "tracksmith",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CLI for inspecting, extracting, syncing, and muxing Matroska audio tracks.",
   "type": "module",
   "bin": {
