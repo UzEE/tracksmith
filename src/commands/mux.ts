@@ -53,26 +53,27 @@ export function resolveAudioTrackId(tracks: Track[], requested: number | undefin
   );
 }
 
-export function buildMuxArgs(a: {
-  video: string;
-  videoTrackIds: readonly number[];
-  clearDefaultAudioIds: readonly number[];
-  groups: readonly ResolvedMuxTrack[];
-  output: string;
-}): string[] {
+export function buildMuxArgs(
+  a: {
+    video: string;
+    videoTrackIds: readonly number[];
+    clearDefaultAudioIds: readonly number[];
+    groups: readonly ResolvedMuxTrack[];
+    output: string;
+  },
+  platform: NodeJS.Platform = process.platform
+): string[] {
   const trackOrder = [
     ...a.videoTrackIds.map((trackId) => `0:${trackId}`),
     ...a.groups.map((group, index) => `${index + 1}:${group.trackId}`)
   ].join(',');
-  const args = [
-    'mkvmerge',
-    '--command-line-charset',
-    'UTF-8',
-    '-o',
-    toolPath(a.output),
-    '--track-order',
-    trackOrder
-  ];
+  // On POSIX mkvmerge decodes --track-name using the locale, so a non-UTF-8
+  // locale silently mangles non-ASCII names unless we pin the charset. The
+  // Windows build receives Unicode arguments natively and rejects this flag
+  // (verified with mkvmerge v100: "The file '--command-line-charset' could not
+  // be opened"), while mkvpropedit accepts it on both.
+  const charset = platform === 'win32' ? [] : ['--command-line-charset', 'UTF-8'];
+  const args = ['mkvmerge', ...charset, '-o', toolPath(a.output), '--track-order', trackOrder];
   for (const id of a.clearDefaultAudioIds) args.push('--default-track-flag', `${id}:no`);
   args.push(toolPath(a.video));
   for (const group of a.groups) {
