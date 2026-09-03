@@ -1,5 +1,11 @@
 # tracksmith
 
+## 0.3.1
+
+### Patch Changes
+
+- [#12](https://github.com/UzEE/tracksmith/pull/12) [`55db4c2`](https://github.com/UzEE/tracksmith/commit/55db4c27e3a43267cd2da633b0ae25d363b059ef) Thanks [@UzEE](https://github.com/UzEE)! - Fixed `mux` failing on Windows with "The file '--command-line-charset' could not be opened for reading". The Windows build of mkvmerge rejects that flag and does not need it, so `mux` now passes it only on POSIX platforms, where it still protects non-ASCII `--name` values under non-UTF-8 locales.
+
 ## 0.3.0
 
 ### Minor Changes
