@@ -24,7 +24,9 @@ Usage:
                  [--audio <next> ...]
 
 Notes:
-  Repeat --audio to add several tracks; per-track flags apply to the most recent --audio; --default may be set on at most one; --dry-run prints the planned track layout without writing.
+  Repeat --audio to add several tracks; per-track flags apply to the most recent --audio.
+  --default may be set on at most one --audio; it also clears the target's existing default audio flags.
+  --dry-run prints the planned track layout without writing.
   --track is always the MKVToolNix track ID shown by "tracksmith inspect".
   edit changes metadata in place without remuxing. --name "" and --title "" clear the value
   (in Windows PowerShell use --name= and --title=; empty "" arguments get dropped).
