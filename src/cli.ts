@@ -5,7 +5,7 @@ import type { CommandDeps } from './types.ts';
 import { editCommand } from './commands/edit.ts';
 import { extractCommand } from './commands/extract.ts';
 import { inspectCommand } from './commands/inspect.ts';
-import { muxCommand } from './commands/mux.ts';
+import { describeAudioGroup, muxCommand } from './commands/mux.ts';
 import { testClipCommand } from './commands/test-clip.ts';
 import { CliError } from './types.ts';
 
@@ -19,11 +19,14 @@ Usage:
   tracksmith edit <file> --title <text>
   tracksmith test-clip --video <target> --audio <donor> --track <id> --start <time>
                        [--duration 60] [--delay-ms 0] [--output <file>] [--force]
-  tracksmith mux --video <target> --audio <mka-or-mkv> --output <file>
-                 [--track <id>] [--delay-ms 0] [--language eng] [--name <title>]
-                 [--default] [--force]
+  tracksmith mux --video <target> --output <file> [--dry-run] [--force]
+                 --audio <mka-or-mkv> [--track <id>] [--delay-ms 0] [--language eng] [--name <title>] [--default]
+                 [--audio <next> ...]
 
 Notes:
+  Repeat --audio to add several tracks; per-track flags apply to the most recent --audio.
+  --default may be set on at most one --audio; it also clears the target's existing default audio flags.
+  --dry-run prints the planned track layout without writing.
   --track is always the MKVToolNix track ID shown by "tracksmith inspect".
   edit changes metadata in place without remuxing. --name "" and --title "" clear the value
   (in Windows PowerShell use --name= and --title=; empty "" arguments get dropped).
@@ -171,41 +174,113 @@ export async function runCli(
         return 0;
       }
       case 'mux': {
-        const { values } = parseOrCliError(() =>
+        const { values, tokens } = parseOrCliError(() =>
           parseArgs({
             args: rest,
             options: {
               video: { type: 'string' },
-              audio: { type: 'string' },
-              track: { type: 'string' },
-              'delay-ms': { type: 'string', default: '0' },
-              language: { type: 'string', default: 'eng' },
-              name: { type: 'string' },
-              default: { type: 'boolean', default: false },
               output: { type: 'string' },
-              force: { type: 'boolean', default: false }
+              force: { type: 'boolean', default: false },
+              'dry-run': { type: 'boolean', default: false },
+              audio: { type: 'string', multiple: true },
+              track: { type: 'string', multiple: true },
+              'delay-ms': { type: 'string', multiple: true },
+              language: { type: 'string', multiple: true },
+              name: { type: 'string', multiple: true },
+              default: { type: 'boolean', multiple: true }
             },
-            strict: true
+            strict: true,
+            tokens: true
           })
         );
-        if (!values.video || !values.audio) throw new CliError('mux requires --video and --audio.');
+        const groups: {
+          audio: string;
+          track?: string;
+          delayMs?: string;
+          language?: string;
+          name?: string;
+          makeDefault?: true;
+        }[] = [];
+        for (const token of tokens) {
+          if (token.kind !== 'option') continue;
+          if (token.name === 'audio') {
+            groups.push({ audio: token.value });
+            continue;
+          }
+          if (
+            token.name !== 'track' &&
+            token.name !== 'delay-ms' &&
+            token.name !== 'language' &&
+            token.name !== 'name' &&
+            token.name !== 'default'
+          ) {
+            continue;
+          }
+          const group = groups.at(-1);
+          if (group === undefined) {
+            throw new CliError(`--${token.name} must come after an --audio input.`);
+          }
+          switch (token.name) {
+            case 'track':
+              if (group.track !== undefined)
+                throw new CliError(
+                  `Duplicate --track for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
+              group.track = token.value;
+              break;
+            case 'delay-ms':
+              if (group.delayMs !== undefined)
+                throw new CliError(
+                  `Duplicate --delay-ms for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
+              group.delayMs = token.value;
+              break;
+            case 'language':
+              if (group.language !== undefined)
+                throw new CliError(
+                  `Duplicate --language for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
+              group.language = token.value;
+              break;
+            case 'name':
+              if (group.name !== undefined)
+                throw new CliError(
+                  `Duplicate --name for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
+              group.name = token.value;
+              break;
+            case 'default':
+              if (group.makeDefault !== undefined)
+                throw new CliError(
+                  `Duplicate --default for ${describeAudioGroup(groups.length - 1, group.audio)}.`
+                );
+              group.makeDefault = true;
+              break;
+          }
+        }
+        if (!values.video || groups.length === 0)
+          throw new CliError('mux requires --video and --audio.');
         if (!values.output)
           throw new CliError('mux requires --output (no default output name for the final file).');
-        const output = await muxCommand(
+        const result = await muxCommand(
           {
             video: values.video,
-            audio: values.audio,
-            track: values.track === undefined ? undefined : parseTrack(values.track),
-            delayMs: parseIntStrict(values['delay-ms'] ?? '0', '--delay-ms'),
-            language: values.language,
-            name: values.name,
-            makeDefault: values.default ?? false,
+            tracks: groups.map((group) => ({
+              audio: group.audio,
+              track: group.track === undefined ? undefined : parseTrack(group.track),
+              delayMs: parseIntStrict(group.delayMs ?? '0', '--delay-ms'),
+              language: group.language ?? 'eng',
+              name: group.name,
+              makeDefault: group.makeDefault ?? false
+            })),
             output: values.output,
-            force: values.force ?? false
+            force: values.force ?? false,
+            dryRun: values['dry-run'] ?? false
           },
           deps
         );
-        stdout(`Wrote ${output}`);
+        if (result.kind === 'dry-run') stdout(result.plan);
+        else stdout(`Wrote ${result.output}`);
         return 0;
       }
       case 'edit': {

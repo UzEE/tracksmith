@@ -3,18 +3,7 @@ import type { CommandDeps, Track } from '../types.ts';
 import { requireInputFile } from '../output.ts';
 import { probeFile } from '../probe.ts';
 
-export function formatTrackTable(tracks: Track[]): string {
-  const header = ['ID', 'TYPE', 'CODEC', 'LANG', 'CH', 'DEFAULT', 'FORCED', 'NAME'];
-  const rows = tracks.map((track) => [
-    String(track.id),
-    track.type,
-    track.codec,
-    track.language ?? '-',
-    track.channels !== undefined ? String(track.channels) : '-',
-    track.isDefault ? 'yes' : '-',
-    track.isForced ? 'yes' : '-',
-    track.name ?? '-'
-  ]);
+export function formatTable(header: readonly string[], rows: readonly string[][]): string {
   const all = [header, ...rows];
   const widths = header.map((_, column) => Math.max(...all.map((row) => row[column]!.length)));
   return all
@@ -25,6 +14,22 @@ export function formatTrackTable(tracks: Track[]): string {
         .trimEnd()
     )
     .join('\n');
+}
+
+export function formatTrackTable(tracks: Track[]): string {
+  return formatTable(
+    ['ID', 'TYPE', 'CODEC', 'LANG', 'CH', 'DEFAULT', 'FORCED', 'NAME'],
+    tracks.map((track) => [
+      String(track.id),
+      track.type,
+      track.codec,
+      track.language ?? '-',
+      track.channels !== undefined ? String(track.channels) : '-',
+      track.isDefault ? 'yes' : '-',
+      track.isForced ? 'yes' : '-',
+      track.name ?? '-'
+    ])
+  );
 }
 
 export async function inspectCommand(file: string, deps: CommandDeps): Promise<string> {
