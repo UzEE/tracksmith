@@ -64,7 +64,15 @@ export function buildMuxArgs(a: {
     ...a.videoTrackIds.map((trackId) => `0:${trackId}`),
     ...a.groups.map((group, index) => `${index + 1}:${group.trackId}`)
   ].join(',');
-  const args = ['mkvmerge', '-o', toolPath(a.output), '--track-order', trackOrder];
+  const args = [
+    'mkvmerge',
+    '--command-line-charset',
+    'UTF-8',
+    '-o',
+    toolPath(a.output),
+    '--track-order',
+    trackOrder
+  ];
   for (const id of a.clearDefaultAudioIds) args.push('--default-track-flag', `${id}:no`);
   args.push(toolPath(a.video));
   for (const group of a.groups) {

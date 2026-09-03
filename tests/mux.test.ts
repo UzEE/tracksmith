@@ -72,6 +72,8 @@ test('buildMuxArgs emits one input block per group after the target', () => {
   });
   expect(args).toEqual([
     'mkvmerge',
+    '--command-line-charset',
+    'UTF-8',
     '-o',
     'final.mkv',
     '--track-order',
@@ -116,8 +118,10 @@ test('buildMuxArgs clears existing default audio flags on the video input', () =
     output: 'final.mkv',
     groups: [{ audio: 'a.mka', trackId: 0, delayMs: 0, makeDefault: true }]
   });
-  expect(args.slice(0, 10)).toEqual([
+  expect(args.slice(0, 12)).toEqual([
     'mkvmerge',
+    '--command-line-charset',
+    'UTF-8',
     '-o',
     'final.mkv',
     '--track-order',
@@ -192,8 +196,10 @@ test('muxCommand probes the video then each unique audio input once', async () =
   expect(runner.calls[1]).toEqual(['mkvmerge', '-J', 'dual.mka']);
   expect(runner.calls).toHaveLength(3);
   const mux = runner.calls[2]!;
-  expect(mux.slice(0, 5)).toEqual([
+  expect(mux.slice(0, 7)).toEqual([
     'mkvmerge',
+    '--command-line-charset',
+    'UTF-8',
     '-o',
     'final.mkv',
     '--track-order',
