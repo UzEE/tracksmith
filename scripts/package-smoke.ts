@@ -143,7 +143,15 @@ function packageSmoke(): void {
       JSON.stringify({ name: 'tracksmith-bun-smoke', private: true })
     );
 
-    run('npm', ['install', '--ignore-scripts', '--no-package-lock', tarballPath], nodeProject);
+    // --no-audit: npm's advisory lookup is a network call that has hung for the
+    // full 5-minute fetch timeout both locally and in CI; it adds nothing to a
+    // smoke test of a local tarball. --no-fund skips the funding lookup for the
+    // same reason.
+    run(
+      'npm',
+      ['install', '--ignore-scripts', '--no-package-lock', '--no-audit', '--no-fund', tarballPath],
+      nodeProject
+    );
     const nodeHelp = run('npx', ['--no-install', 'tracksmith', '--help'], nodeProject);
     requireUsage(nodeHelp.stdout, 'Node');
 
